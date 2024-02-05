@@ -15,7 +15,8 @@ def preprocess_data(df):
             try:
                 df[col] = df[col].astype(float)
             except ValueError:
-                print(f"Cannot convert column {col} to float.")
+                pass
+                # print(f"Cannot convert column {col} to float.")
 
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['date'] = df['timestamp'].dt.date
