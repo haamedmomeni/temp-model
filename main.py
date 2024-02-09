@@ -1,11 +1,10 @@
-import numpy as np
-from dash import dcc, html, Dash, Input, Output
-import plotly.graph_objs as go
-from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error
+from dash import Dash, dcc, html, Input, Output, State
+import dash_bootstrap_components as dbc
+from io import BytesIO
+from zipfile import ZipFile
 
 from data_processing import load_csv, preprocess_data, split_train_test, get_column_list, smooth_data, filter_dataframe_by_hours
-from plotting import generate_scatter_plot, create_figure
+from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
 from get_ip import get_wired_interface_ip
 
 # Load data
@@ -19,71 +18,77 @@ train_df, test_df = split_train_test(processed_df)
 train_df = smooth_data(train_df)
 test_df = smooth_data(test_df)
 
-# === Dash App Initialization ===
-app = Dash(__name__)
-
 # Assume col_list is a list of column names from your DataFrame
 col_list = get_column_list(processed_df)
-
 # Generate the options dynamically based on column names
 options = [{'label': col, 'value': f'SHOW_{col.upper().replace(" ", "_")}'} for col in col_list]
 
+html.Button('Save Data as CSV', id='save-csv-btn', n_clicks=0),
+dcc.Download(id='download-train-csv'),
+dcc.Download(id='download-test-csv'),
 
-# === Dash Component Generating Function ===
-def create_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis_title=''):
-    return html.Div([
-        html.H2(title),
-        dcc.Graph(
-            id=graph_id,
-            figure={
-                'data': [data],
-                'layout': go.Layout(
-                    title=title,
-                    xaxis={'title': x_axis_title},
-                    yaxis={'title': y_axis_title}
-                )
-            }
-        )
-    ], style={'width': '48%', 'display': 'inline-block'})
 
+# === Dash App Initialization ===
+app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
 
 # # === Dash Layout ===
 app.layout = html.Div([
-    html.H1('Predictive Model Dashboard'),
-    html.Div(style={'display': 'flex', 'flexWrap': 'wrap'}, children=[  # Use flexbox for layout
+    html.H3('Predictive Model Dashboard'),
+
+    html.Button('Download Data as ZIP', id='download-zip-btn',
+                style={'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white", "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}),
+    dcc.Download(id='download-zip'),
+
+    html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between'}, children=[
         # First column
         html.Div([
             html.Label('Temperatures:',
                        style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
-            dcc.Checklist(id='toggle-data', options=options, value=[]),
+
+            dcc.Checklist(
+                id='toggle-data',
+                options=options,
+                value=[],
+                style={'display': 'block', 'margin': '5px', 'fontWeight': 'bold'},
+                inputStyle={"margin-right": "5px", "cursor": "pointer"},
+                labelStyle={"display": "block", "margin": "5px", "color": "white", "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
+            ),
+
             html.Br(),
+
             html.Div([
-                html.Label('Select Starting Hour:', style={'display': 'inline-block', 'margin-right': '10px'}),
+                html.Label('Select Starting Hour:',
+                           style={'display': 'inline-block', 'margin-right': '10px',  'width': '150px'}),
                 dcc.Dropdown(
                     id='start-hour-input',
                     options=[{'label': f'{i} AM' if i < 12 else f'{i} PM', 'value': i} for i in range(24)],
                     value=20,  # Default value
                     clearable=False,
-                    style={'width': '150px', 'display': 'inline-block'}
+                    style={'width': '80px', 'display': 'inline-block', 'color': 'black'}
                 ),
-            ]),
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+
             html.Br(),
+
             html.Div([
-                html.Label('Select Ending Hour:', style={'display': 'inline-block', 'margin-right': '10px'}),
+                html.Label('Select Ending Hour:',
+                           style={'display': 'inline-block', 'margin-right': '10px',  'width': '150px'}),
                 dcc.Dropdown(
                     id='end-hour-input',
                     options=[{'label': f'{i} AM' if i < 12 else f'{i} PM', 'value': i} for i in range(24)],
                     value=6,  # Default value
                     clearable=False,
-                    style={'width': '150px', 'display': 'inline-block'}
+                    style={'width': '80px', 'display': 'inline-block', 'color': 'black'}
                 ),
-            ]),
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+
             html.Br(),
+
         ], style={'width': '10%', 'display': 'inline-block', 'verticalAlign': 'top'}),
 
         # Second column (Combining Second and Third rows)
         html.Div([
-            html.Div(id='equation-display-2'),
+            html.Div(id='equation-display-2', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential Y motion)', 'train-diff-2-4',
                              generate_scatter_plot(train_df['timestamp'].values,
                                                    train_df['smoothed_difference_2_4'].values,
@@ -94,7 +99,7 @@ app.layout = html.Div([
                                                    test_df['smoothed_difference_2_4'].values,
                                                    'purple', 'observation'),
                              y_axis_title='Smoothed Difference 2-4'),
-            html.Div(id='equation-display-1'),
+            html.Div(id='equation-display-1', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential X motion)', 'train-diff-1-3',
                              generate_scatter_plot(train_df['timestamp'].values,
                                                    train_df['smoothed_difference_1_3'].values,
@@ -105,47 +110,9 @@ app.layout = html.Div([
                                                    test_df['smoothed_difference_1_3'].values,
                                                    'red', 'observation'),
                              y_axis_title='Smoothed Difference 1-3')
-        ], style={'width': '90%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+        ], style={'width': '90%', 'display': 'inline-block'}),
     ]),
 ])
-
-
-def fit_and_predict_linear_eq(toggle_value, train_df, col):
-    # Always consider 'Difference 1-3' as the target variable
-    y = train_df[col].dropna().values.reshape(-1, 1)
-
-    # Create a mapping dictionary from value to label
-    value_to_label = {option['value']: option['label'] for option in options}
-
-    # Initialize feature matrix X
-    X = np.empty((len(y), 0))
-
-    # Loop through the toggle values
-    for value in toggle_value:
-        # Extract the original column name using the mapping dictionary
-        col_name = value_to_label[value]
-        # Now add 'smoothed_' prefix before checking in DataFrame
-        col_data = train_df[f'smoothed_{col_name}'].dropna().values.reshape(-1, 1)
-        # Append as a new column to feature matrix X
-        X = np.c_[X, col_data]
-
-    # Fit the linear equation
-    model = LinearRegression()
-    model.fit(X, y)
-
-    # Predict the values of y (Difference 1-3)
-    y_pred = model.predict(X)
-    y_pred = y_pred.ravel()
-    rmse = mean_squared_error(y, y_pred, squared=False)
-
-    return y_pred, rmse, model.coef_, model.intercept_
-
-
-# Function to generate equation string
-def generate_equation_str(coef, intercept):
-    coef = coef.flatten().tolist()
-    equation_terms = [f"{c:.2f}*x{i + 1}" for i, c in enumerate(coef)]
-    return f"y = {intercept[0]:.2f} + {' + '.join(equation_terms)}"
 
 
 @app.callback(
@@ -157,42 +124,12 @@ def generate_equation_str(coef, intercept):
      Input('end-hour-input', 'value')]
 )
 def update_diff_1_3_graphs(toggle_value, start_hour, end_hour):
+    return update_graphs_and_predictions(toggle_value, start_hour, end_hour, train_df, test_df,
+                                         'smoothed_difference_1_3',
+                                         'Training Data: Smoothed Difference (Column 3 - Column 1)',
+                                         'Test Data: Smoothed Difference (Column 3 - Column 1)',
+                                         options)
 
-    trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
-    test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
-
-    # Initialize data list with original scatter plots
-    train_data_list = [generate_scatter_plot(trained_df_filtered['timestamp'].values,
-                                             trained_df_filtered['smoothed_difference_1_3'].values,
-                                             'blue', 'observation')]
-    test_data_list = [generate_scatter_plot(test_df_filtered['timestamp'].values,
-                                            test_df_filtered['smoothed_difference_1_3'].values,
-                                            'green', 'observation')]
-
-    equation_str = "No equation to display"
-
-    # If no features selected, return early with default figures and equation
-    if not toggle_value:
-        return (create_figure(train_data_list, 'Training Data: Smoothed Difference (Column 3 - Column 1)'),
-                create_figure(test_data_list, 'Test Data: Smoothed Difference (Column 3 - Column 1)'),
-                equation_str)
-
-    # Generate predictions and update data list
-    y_pred_train, rmse_train, coef, intercept = fit_and_predict_linear_eq(toggle_value, trained_df_filtered,
-                                                            col='smoothed_difference_1_3')
-    y_pred_test, rmse_test, _, _ = fit_and_predict_linear_eq(toggle_value, test_df_filtered,
-                                                            col='smoothed_difference_1_3')
-    train_data_list.append(generate_scatter_plot(trained_df_filtered['timestamp'].values, y_pred_train,
-                                                 'red', 'prediction'+f", rmse: {rmse_train:.2f}"))
-    test_data_list.append(generate_scatter_plot(test_df_filtered['timestamp'].values, y_pred_test,
-                                                'orange', 'prediction'+f", rmse: {rmse_test:.2f}"))
-
-    # Update equation string
-    equation_str = generate_equation_str(coef, intercept)
-
-    return (create_figure(train_data_list, 'Training Data: Smoothed Difference (Column 3 - Column 1)'),
-            create_figure(test_data_list, 'Test Data: Smoothed Difference (Column 3 - Column 1)'),
-            equation_str)
 
 @app.callback(
     [Output('train-diff-2-4', 'figure'),
@@ -203,42 +140,49 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour):
      Input('end-hour-input', 'value')]
 )
 def update_diff_2_4_graphs(toggle_value, start_hour, end_hour):
+    return update_graphs_and_predictions(toggle_value, start_hour, end_hour, train_df, test_df,
+                                         'smoothed_difference_2_4',
+                                         'Training Data: Smoothed Difference (Column 4 - Column 2)',
+                                         'Test Data: Smoothed Difference (Column 4 - Column 2)',
+                                         options)
 
-    trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
-    test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
 
-    # Initialize data list with original scatter plots
-    train_data_list = [generate_scatter_plot(trained_df_filtered['timestamp'].values,
-                                             trained_df_filtered['smoothed_difference_2_4'].values,
-                                             'blue', 'observation')]
-    test_data_list = [generate_scatter_plot(test_df_filtered['timestamp'].values,
-                                            test_df_filtered['smoothed_difference_2_4'].values,
-                                            'green', 'observation')]
+@app.callback(
+    Output('download-zip', 'data'),
+    Input('download-zip-btn', 'n_clicks'),
+    State('toggle-data', 'value'),
+    State('start-hour-input', 'value'),
+    State('end-hour-input', 'value'),
+    prevent_initial_call=True
+)
+def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
+    if n_clicks > 0:
 
-    equation_str = "No equation to display"
+        trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
+        test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
 
-    # If no features selected, return early with default figures and equation
-    if not toggle_value:
-        return (create_figure(train_data_list, 'Training Data: Smoothed Difference (Column 4 - Column 2)'),
-                create_figure(test_data_list, 'Test Data: Smoothed Difference (Column 4 - Column 2)'),
-                equation_str)
+        # Create a mapping from value to label
+        value_to_label = {option['value']: option['label'] for option in options}
 
-    # Generate predictions and update data list
-    y_pred_train, rmse_train, coef, intercept = fit_and_predict_linear_eq(toggle_value, trained_df_filtered,
-                                                            col='smoothed_difference_2_4')
-    y_pred_test, rmse_test, _, _ = fit_and_predict_linear_eq(toggle_value, test_df_filtered,
-                                                            col='smoothed_difference_2_4')
-    train_data_list.append(generate_scatter_plot(trained_df_filtered['timestamp'].values, y_pred_train,
-                                                 'red', 'prediction'+f", rmse: {rmse_train:.2f}"))
-    test_data_list.append(generate_scatter_plot(test_df_filtered['timestamp'].values, y_pred_test,
-                                                'orange', 'prediction'+f", rmse: {rmse_test:.2f}"))
+        # Filter columns based on selected options
+        selected_columns = (['timestamp'] +
+                            [value_to_label[value] for value in toggle_value] +
+                            ['smoothed_difference_1_3', 'smoothed_difference_2_4'])
 
-    # Update equation string
-    equation_str = generate_equation_str(coef, intercept)
+        # Create in-memory ZIP file
+        zip_buffer = BytesIO()
+        with ZipFile(zip_buffer, 'w') as zip_file:
+            # Convert train_df and test_df to CSV strings without index
+            train_csv = trained_df_filtered[selected_columns].dropna().to_csv(index=False)
+            test_csv = test_df_filtered[selected_columns].dropna().to_csv(index=False)
 
-    return (create_figure(train_data_list, 'Training Data: Smoothed Difference (Column 4 - Column 2)'),
-            create_figure(test_data_list, 'Test Data: Smoothed Difference (Column 4 - Column 2)'),
-            equation_str)
+            # Write CSV strings to the ZIP file
+            zip_file.writestr('train_data.csv', train_csv)
+            zip_file.writestr('test_data.csv', test_csv)
+
+        # Prepare the ZIP file to be sent to the client
+        zip_buffer.seek(0)
+        return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
 
 
 # === Run the App ===
