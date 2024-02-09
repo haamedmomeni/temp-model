@@ -1,6 +1,7 @@
-dash
 numpy
 pandas
-plotly
 scikit-learn
+plotly
+dash
+dash_bootstrap_components
 netifaces
