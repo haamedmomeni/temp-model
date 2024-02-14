@@ -1,14 +1,18 @@
 # Predictive Model Dashboard
 
 ## Overview
-This repository contains the code for a HTML dashboard designed to visualize and analyze predictive models' performance. The dashboard is live and can be accessed [here](https://temp-model-dash.onrender.com/).
+
+This repository hosts the code for a dynamic HTML dashboard designed to visualize and evaluate the performance of predictive models. The dashboard is interactive and publicly accessible at [temp-model-dash.onrender.com](https://temp-model-dash.onrender.com/).
 
 ### Screenshot
 ![Predictive Model Dashboard Screenshot](/src/screenshot.png "Dashboard Overview")
 
+## Key Features
 
-## Features
-The dashboard showcases the predictive capabilities of our models through various interactive charts. It provides a comparison between observed data and predictions, highlighting the model's precision with maximum error rates.
+- **Interactive Charts**: Explore predictive model accuracy with charts that compare observed data against model predictions.
+- **Custom Data Ranges**: Select specific data ranges for detailed analysis by adjusting the start and end hours.
+- **Real-time Data Processing**: View the latest results with data dynamically updated to reflect current metrics.
+- **Responsive Design**: Access the dashboard on any device, optimized for both desktop and mobile viewing.
 
 ### Graphical Representations Include:
 - Training Data (Differential Y motion)
@@ -39,4 +43,3 @@ The Temp-Model Dashboard retrieves data from various sources and processes it to
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
