@@ -2,6 +2,8 @@
 
 ## Overview
 This repository contains the code for a HTML dashboard designed to visualize and analyze predictive models' performance. The dashboard is live and can be accessed [here](https://temp-model-dash.onrender.com/).
+
+### Screenshot
 ![Predictive Model Dashboard Screenshot](/src/screenshot.png "Dashboard Overview")
 
 
@@ -36,4 +38,5 @@ The Temp-Model Dashboard retrieves data from various sources and processes it to
 
 ## License
 
-This project is licensed under the MIT License
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
