@@ -23,9 +23,11 @@ Users can select a range of data they wish to analyze by specifying the starting
 To set up this dashboard locally, clone the repository to your machine and follow the instructions below:
 
 ```bash
-git clone https://github.com/haamedmomeni/temp-model.git
-cd temp-model
-python3 src/app.py
+$ git clone https://github.com/haamedmomeni/temp-model.git
+$ cd temp-model
+$ pip install -r requirements.txt
+$ cd src
+$ python3 app.py
 ```
 
 ## How It Works
