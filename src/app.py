@@ -10,9 +10,10 @@ from get_ip import get_wired_interface_ip
 # Load data
 FILENAME = '2024-01-10.csv'
 raw_df = load_csv(FILENAME)
+
 # Preprocess data
 processed_df = preprocess_data(raw_df)
-processed_df.to_csv('processed_df.csv')
+
 # Split data into training and test datasets
 train_df, test_df = split_train_test(processed_df)
 train_df = smooth_data(train_df)
