@@ -28,7 +28,6 @@ def create_figure(data_list, title):
 # Function to generate equation string
 def generate_equation_str(coef, intercept, toggle_value):
     coef = coef.flatten().tolist()
-    # equation_terms = [f"{c:.2f}*x{i + 1}" for i, c in enumerate(coef)]
     equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} {toggle_value[i][5:].lower()}" for i, c in enumerate(coef)]
     return f"Equation: {intercept[0]:.2f}  {' '.join(equation_terms)}"
 
@@ -74,7 +73,7 @@ def update_graphs_and_predictions(toggle_value, start_hour, end_hour, train_df, 
         test_data_list.append(generate_scatter_plot(test_df_filtered['timestamp'].values, y_pred_test, 'orange',
                                                     f"prediction<br>rmse: {rmse_test:.2f}<br>max err: {max_err_test:.2f}"))
 
-        equation_str = generate_equation_str(coef, intercept, toggle_value)
+        # equation_str = generate_equation_str(coef, intercept, toggle_value)
 
     return (create_figure(train_data_list, train_fig_title),
             create_figure(test_data_list, test_fig_title),

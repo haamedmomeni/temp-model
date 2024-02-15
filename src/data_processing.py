@@ -2,6 +2,12 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, max_error
+import xgboost as xg
+
+import matplotlib.pyplot as plt
+from xgboost import plot_tree
+import matplotlib
+matplotlib.use('agg')
 
 
 def load_csv(file_path):
@@ -12,6 +18,9 @@ def load_csv(file_path):
 
 
 def preprocess_data(df):
+    # First, ensure the DataFrame is sorted by timestamp.
+    df.sort_values('timestamp', inplace=True)
+
     for col in df.columns:
         if df[col].dtype == 'object':
             try:
@@ -31,6 +40,25 @@ def preprocess_data(df):
 
     # Drop intermediate columns if necessary
     df.drop(columns=['time'], inplace=True)
+
+    # # Convert 'timestamp' column to datetime, ensuring it matches the format with milliseconds
+    # df['timestamp2'] = pd.to_datetime(df['timestamp'], format='%Y-%m-%d %H:%M:%S,%f')
+    #
+    # # It might be useful to set the timestamp column as the index if you're planning on using time-based shifting
+    # df.set_index('timestamp2', inplace=True)
+    #
+    # # Shift without using freq since we're directly manipulating the DataFrame index
+    # for col in df.columns:
+    #     if df[col].dtype != 'object':
+    #         new_col_name = f"{col}_1hr_ago"
+    #         # Shift the series by the equivalent of 1 hour in your DataFrame's frequency
+    #         df[new_col_name] = df[col].shift(periods=1)  # Adjust periods based on your DataFrame's actual frequency
+    #
+    # # Reset index if you want to keep 'timestamp' as a column instead of index
+    # df.reset_index(inplace=True)
+    # # Drop intermediate columns if necessary
+    # df.drop(columns=['timestamp2'], inplace=True)
+
     return df
 
 
@@ -118,6 +146,7 @@ def add_reference_columns(df, hour, col_name, new_col_name):
 
     return new_df
 
+
 def fit_and_predict_linear_eq(toggle_value, training_df, col, options):
     # Create a mapping dictionary from value to label
     value_to_label = {option['value']: option['label'] for option in options}
@@ -132,9 +161,21 @@ def fit_and_predict_linear_eq(toggle_value, training_df, col, options):
     X = df_selected[col_names[:-1]].to_numpy()
     y = df_selected[col].values.reshape(-1, 1)
 
-    # Fit the linear equation
-    model = LinearRegression()
+    # Select the model
+    mode_type = "XG"  # "LR"
+    if mode_type == "XG":
+        model = xg.XGBRegressor(objective='reg:squarederror', n_estimators=10, seed=123)
+    else:
+        model = LinearRegression()
+
+    # Fit the model
     model.fit(X, y)
+
+    # if mode_type == "XG":
+    #     # Plot the fifth tree
+    #     fig, ax = plt.subplots(figsize=(15, 15))
+    #     xg.plot_tree(model, num_trees=4, ax=ax)
+    #     plt.savefig('foo.png', dpi=300)
 
     # Predict the values of y (target variable)
     y_pred = model.predict(X).ravel()  # Flatten the array
@@ -145,6 +186,7 @@ def fit_and_predict_linear_eq(toggle_value, training_df, col, options):
     # Calculate the maximum error
     max_err = max_error(y, y_pred)
 
-    # rmse = mean_squared_error(y, y_pred, squared=False)
-
-    return y_pred, rmse, max_err, model.coef_, model.intercept_
+    if mode_type == "XG":
+        return y_pred, rmse, max_err, 0, 0
+    else:
+        return y_pred, rmse, max_err, model.coef_, model.intercept_
