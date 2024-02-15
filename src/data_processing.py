@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import mean_squared_error, max_error
+import xgboost as xg
 
 
 def load_csv(file_path):
@@ -118,7 +119,7 @@ def add_reference_columns(df, hour, col_name, new_col_name):
 
     return new_df
 
-def fit_and_predict_linear_eq(toggle_value, training_df, col, options):
+def fit_and_predict_linear_eq(model_type, toggle_value, training_df, col, options):
     # Create a mapping dictionary from value to label
     value_to_label = {option['value']: option['label'] for option in options}
 
@@ -132,8 +133,14 @@ def fit_and_predict_linear_eq(toggle_value, training_df, col, options):
     X = df_selected[col_names[:-1]].to_numpy()
     y = df_selected[col].values.reshape(-1, 1)
 
-    # Fit the linear equation
-    model = LinearRegression()
+    # Select the model
+    # model_type = "XG"  # "LR"
+    if model_type == "XGB":
+        model = xg.XGBRegressor(objective='reg:squarederror', n_estimators=10, seed=123)
+    else:
+        model = LinearRegression()
+
+    # Fit the model
     model.fit(X, y)
 
     # Predict the values of y (target variable)
@@ -145,6 +152,7 @@ def fit_and_predict_linear_eq(toggle_value, training_df, col, options):
     # Calculate the maximum error
     max_err = max_error(y, y_pred)
 
-    # rmse = mean_squared_error(y, y_pred, squared=False)
-
-    return y_pred, rmse, max_err, model.coef_, model.intercept_
+    if model_type == "XGB":
+        return y_pred, rmse, max_err, 0, 0
+    else:
+        return y_pred, rmse, max_err, model.coef_, model.intercept_

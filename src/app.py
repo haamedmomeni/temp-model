@@ -8,7 +8,7 @@ from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_
 from get_ip import get_wired_interface_ip
 
 # Load data
-FILENAME = '2024-01-10.csv'
+FILENAME = 'src/2024-01-10.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
@@ -23,6 +23,11 @@ test_df = smooth_data(test_df)
 col_list = get_column_list(processed_df)
 # Generate the options dynamically based on column names
 options = [{'label': col, 'value': f'SHOW_{col.upper().replace(" ", "_")}'} for col in col_list]
+
+model_type_options = [
+    {'label': 'Linear Regression', 'value': 'LR'},
+    {'label': 'XGBoost', 'value': 'XGB'},
+]
 
 html.Button('Save Data as CSV', id='save-csv-btn', n_clicks=0),
 dcc.Download(id='download-train-csv'),
@@ -44,6 +49,22 @@ app.layout = html.Div([
     html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between'}, children=[
         # First column
         html.Div([
+            html.Div([
+                html.Label('Choose Model Type:',
+                           style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold',
+                                  "color": "white"}),
+
+                dcc.RadioItems(
+                    id='model-type-toggle',
+                    options=model_type_options,
+                    value='LR',  # Default value
+                    labelStyle={'display': 'block', "color": "white", "background-color": "#3B3B3B", "padding": "5px",
+                                "border-radius": "5px", "margin": "5px"},
+                    style={'fontWeight': 'bold'}
+                )
+            ],
+                style={'padding': '10px', 'background-color': '#2D2D2D', 'border-radius': '5px'}),
+
             html.Label('Temperatures:',
                        style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
 
@@ -123,10 +144,11 @@ app.layout = html.Div([
      Output('equation-display-1', 'children')],
     [Input('toggle-data', 'value'),
      Input('start-hour-input', 'value'),
-     Input('end-hour-input', 'value')]
+     Input('end-hour-input', 'value'),
+     Input('model-type-toggle', 'value')]
 )
-def update_diff_1_3_graphs(toggle_value, start_hour, end_hour):
-    return update_graphs_and_predictions(toggle_value, start_hour, end_hour, train_df, test_df,
+def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type):
+    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, train_df, test_df,
                                          'smoothed_difference_1_3',
                                          'Training Data: Smoothed Difference (Column 3 - Column 1)',
                                          'Test Data: Smoothed Difference (Column 3 - Column 1)',
@@ -139,10 +161,11 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour):
      Output('equation-display-2', 'children')],
     [Input('toggle-data', 'value'),
      Input('start-hour-input', 'value'),
-     Input('end-hour-input', 'value')]
+     Input('end-hour-input', 'value'),
+     Input('model-type-toggle', 'value')]
 )
-def update_diff_2_4_graphs(toggle_value, start_hour, end_hour):
-    return update_graphs_and_predictions(toggle_value, start_hour, end_hour, train_df, test_df,
+def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type):
+    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, train_df, test_df,
                                          'smoothed_difference_2_4',
                                          'Training Data: Smoothed Difference (Column 4 - Column 2)',
                                          'Test Data: Smoothed Difference (Column 4 - Column 2)',
