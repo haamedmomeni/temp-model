@@ -1,6 +1,7 @@
 import plotly.graph_objs as go
 from dash import dcc, html
-from data_processing import filter_dataframe_by_hours, fit_and_predict_linear_eq
+from data_processing import filter_dataframe_by_hours, fit_and_predict_linear_eq, split_train_test, smooth_data
+from datetime import datetime
 
 
 def generate_scatter_plot(x_array, y_array, color, name):
@@ -52,7 +53,16 @@ def create_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis_tit
     ], style={'width': '48%', 'display': 'inline-block', 'margin-right': '10px'})
 
 
-def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, train_df, test_df, diff_col, train_fig_title, test_fig_title, options):
+def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str, diff_col, train_fig_title, test_fig_title, options):
+    # Convert test_date_str to datetime
+    test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
+
+    # Split data based on selected test date
+    train_df, test_df = split_train_test(df, test_date)
+
+    train_df = smooth_data(train_df)
+    test_df = smooth_data(test_df)
+
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
 

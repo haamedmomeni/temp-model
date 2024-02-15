@@ -41,18 +41,37 @@ def smooth_data(df, window=5):
     return df
 
 
-def split_train_test(df):
-    unique_dates = np.sort(df['date'].unique())
-    last_date = unique_dates[-1]
-    day_before_last = unique_dates[-2]
+# def split_train_test(df):
+#     unique_dates = np.sort(df['date'].unique())
+#     last_date = unique_dates[-1]
+#     day_before_last = unique_dates[-2]
+#
+#     # Define the cutoff timestamp: 6 PM of the day before the last date
+#     cutoff_timestamp = pd.Timestamp(year=day_before_last.year, month=day_before_last.month,
+#                                     day=day_before_last.day, hour=18, minute=0, second=0)
+#
+#     # Split the data based on the cutoff timestamp
+#     train_df = df[df['timestamp'] <= cutoff_timestamp].copy()
+#     test_df = df[df['timestamp'] > cutoff_timestamp].copy()
+#
+#     return train_df, test_df
 
-    # Define the cutoff timestamp: 6 PM of the day before the last date
-    cutoff_timestamp = pd.Timestamp(year=day_before_last.year, month=day_before_last.month,
-                                    day=day_before_last.day, hour=18, minute=0, second=0)
+def split_train_test(df, test_date_str):
+    # Convert test_date_str to a datetime.date object
+    test_date = pd.to_datetime(test_date_str).date()
 
-    # Split the data based on the cutoff timestamp
-    train_df = df[df['timestamp'] <= cutoff_timestamp].copy()
-    test_df = df[df['timestamp'] > cutoff_timestamp].copy()
+    # Calculate the start timestamp (midnight at the beginning of test_date)
+    start_timestamp = pd.Timestamp(test_date) + pd.Timedelta(days=0, hours=18)
+
+    # Calculate the end timestamp (6 PM the day after test_date)
+    end_timestamp = pd.Timestamp(test_date) + pd.Timedelta(days=1, hours=18)
+
+    # Split the data based on the start and end timestamps
+    # Train data: before the test period
+    train_df = df[(df['timestamp'] < start_timestamp) | (df['timestamp'] > end_timestamp)].copy()
+
+    # Test data: within the test period
+    test_df = df[(df['timestamp'] >= start_timestamp) & (df['timestamp'] <= end_timestamp)].copy()
 
     return train_df, test_df
 

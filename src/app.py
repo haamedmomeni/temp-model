@@ -6,16 +6,37 @@ from zipfile import ZipFile
 from data_processing import load_csv, preprocess_data, split_train_test, get_column_list, smooth_data, filter_dataframe_by_hours
 from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
 from get_ip import get_wired_interface_ip
+import numpy as np
+# import pandas as pd
+
+# df1 = load_csv('src/2024-01-10.csv')
+# df2 = load_csv('src/2024-01-13.csv')
+#
+# processed_df1 = preprocess_data(df1)
+# processed_df2 = preprocess_data(df2)
+#
+# processed_df1[['difference_1_3', 'difference_2_4']] = -processed_df1[['difference_1_3', 'difference_2_4']]
+#
+# processed_df = pd.concat([processed_df1, processed_df2], ignore_index=True)
 
 # Load data
-FILENAME = 'src/2024-01-10.csv'
+FILENAME = 'src/2024-01-13.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
 processed_df = preprocess_data(raw_df)
 
-# Split data into training and test datasets
-train_df, test_df = split_train_test(processed_df)
+# List all unique dates in the dataframe
+unique_dates = np.sort(processed_df['date'].unique())[:-1]
+# Format dates as strings
+formatted_dates = [date.strftime('%Y/%m/%d') for date in unique_dates]
+# print("All unique dates in the dataframe:", formatted_dates)
+
+# Create dropdown options
+dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
+
+# # Split data into training and test datasets
+train_df, test_df = split_train_test(processed_df, formatted_dates[-1])
 train_df = smooth_data(train_df)
 test_df = smooth_data(test_df)
 
@@ -107,6 +128,18 @@ app.layout = html.Div([
 
             html.Br(),
 
+            html.Div([
+                html.Label('Select Test Date:',
+                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
+                dcc.Dropdown(
+                    id='test-date-dropdown',
+                    options=dropdown_options,
+                    value=formatted_dates[-1],  # Default value
+                    clearable=False,
+                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
+                ),
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+
         ], style={'width': '10%', 'display': 'inline-block', 'verticalAlign': 'top'}),
 
         # Second column (Combining Second and Third rows)
@@ -145,10 +178,12 @@ app.layout = html.Div([
     [Input('toggle-data', 'value'),
      Input('start-hour-input', 'value'),
      Input('end-hour-input', 'value'),
-     Input('model-type-toggle', 'value')]
+     Input('model-type-toggle', 'value'),
+     Input('test-date-dropdown', 'value')
+     ]
 )
-def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type):
-    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, train_df, test_df,
+def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str):
+    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str,
                                          'smoothed_difference_1_3',
                                          'Training Data: Smoothed Difference (Column 3 - Column 1)',
                                          'Test Data: Smoothed Difference (Column 3 - Column 1)',
@@ -162,10 +197,11 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type):
     [Input('toggle-data', 'value'),
      Input('start-hour-input', 'value'),
      Input('end-hour-input', 'value'),
-     Input('model-type-toggle', 'value')]
+     Input('model-type-toggle', 'value'),
+     Input('test-date-dropdown', 'value')]
 )
-def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type):
-    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, train_df, test_df,
+def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str):
+    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str,
                                          'smoothed_difference_2_4',
                                          'Training Data: Smoothed Difference (Column 4 - Column 2)',
                                          'Test Data: Smoothed Difference (Column 4 - Column 2)',
