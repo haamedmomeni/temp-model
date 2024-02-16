@@ -23,6 +23,7 @@ def preprocess_data(df):
 
     df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['date'] = df['timestamp'].dt.date
+    df['time'] = df['timestamp'].dt.time
 
     df['difference_1_3'] = df.iloc[:, 3] - df.iloc[:, 1]
     df['difference_2_4'] = df.iloc[:, 4] - df.iloc[:, 2]
@@ -38,6 +39,13 @@ def preprocess_data(df):
 def smooth_data(df, window=5):
     for column in df.select_dtypes(include=[np.number]).columns:
         df[f'smoothed_{column}'] = df[column].rolling(window=window).mean()
+
+    # Keep only columns that start with 'smoothed_'
+    # This includes creating a list of columns to drop that don't start with 'smoothed_'
+    cols_to_drop = [col for col in df.columns if not col.startswith('smoothed_')
+                    and col not in ['date', 'time', 'timestamp']]
+    df.drop(cols_to_drop, axis=1, inplace=True)
+
     return df
 
 
@@ -68,10 +76,10 @@ def split_train_test(df, test_date_str):
 
     # Split the data based on the start and end timestamps
     # Train data: before the test period
-    train_df = df[(df['timestamp'] < start_timestamp) | (df['timestamp'] > end_timestamp)].copy()
+    train_df = df[(df['timestamp'] <= start_timestamp) | (df['timestamp'] >= end_timestamp)].copy()
 
     # Test data: within the test period
-    test_df = df[(df['timestamp'] >= start_timestamp) & (df['timestamp'] <= end_timestamp)].copy()
+    test_df = df[(df['timestamp'] > start_timestamp) & (df['timestamp'] < end_timestamp)].copy()
 
     return train_df, test_df
 
@@ -88,10 +96,14 @@ def get_column_list(df):
         col_list (list): The list of relevant column names.
     """
     col_list = df.columns.tolist()
-    items_to_remove = ['timestamp', 'Reference Mirror X-Motion', 'Reference Mirror Y-Motion', 'Motorized Mirror X-Motion',
-                       'Motorized Mirror Y-Motion', 'Differential X-Motion', 'Differential Y-Motion',
+    items_to_remove = ['timestamp', 'Reference Mirror X-Motion', 'Reference Mirror Y-Motion',
+                       'Motorized Mirror X-Motion', 'Motorized Mirror Y-Motion',
+                       'Differential X-Motion', 'Differential Y-Motion',
                        'difference_1_3', 'difference_2_4', 'date']
-    col_list = [item for item in col_list if item not in items_to_remove]
+    # col_list = [item for item in col_list if item not in items_to_remove] # and not item.startswith('smoothed')]
+    col_list = [item.replace('smoothed_', '') for item in col_list
+                if item.replace('smoothed_', '') not in items_to_remove]
+
     return col_list
 
 
@@ -104,9 +116,6 @@ def filter_dataframe_by_hours(df, start_hour, end_hour):
 
 
 def add_reference_columns(df, hour, col_name, new_col_name):
-    # Ensure the 'date' and 'time' columns are present
-    df['date'] = df['timestamp'].dt.date
-    df['time'] = df['timestamp'].dt.time
 
     # Convert hour to a time object
     reference_time = pd.to_datetime(f'{hour:02d}:00:00').time()
@@ -130,13 +139,15 @@ def add_reference_columns(df, hour, col_name, new_col_name):
 
     # Determine which reference value to use for each row
     new_df[new_col_name] = new_df.apply(
-        lambda row: row[f'{col_name}_at_6_yesterday'] if row['time'] < reference_time else row[f'{col_name}_at_6'], axis=1
+        lambda row: row[f'{col_name}_at_6_yesterday']
+        if row['time'] < reference_time else row[f'{col_name}_at_6'], axis=1
     )
 
     # Drop intermediate columns if necessary
     new_df.drop(columns=[f'{col_name}_at_6', f'{col_name}_at_6_yesterday'], inplace=True)
 
     return new_df
+
 
 def fit_and_predict_linear_eq(model_type, toggle_value, training_df, col, options):
     # Create a mapping dictionary from value to label
@@ -155,7 +166,18 @@ def fit_and_predict_linear_eq(model_type, toggle_value, training_df, col, option
     # Select the model
     # model_type = "XG"  # "LR"
     if model_type == "XGB":
-        model = xg.XGBRegressor(objective='reg:squarederror', n_estimators=10, seed=123)
+        # model = xg.XGBRegressor(objective='reg:squarederror', n_estimators=20, seed=123)
+        model = xg.XGBRegressor(
+            objective='reg:squarederror',
+            n_estimators=20,  # Increased number of trees
+            # learning_rate=0.1,  # Lower learning rate
+            # max_depth=5,  # Limiting tree depth
+            # min_child_weight=1,
+            subsample=0.8,
+            colsample_bytree=0.8,
+            gamma=0,
+            seed=123
+        )
     else:
         model = LinearRegression()
 

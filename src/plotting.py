@@ -1,6 +1,6 @@
 import plotly.graph_objs as go
 from dash import dcc, html
-from data_processing import filter_dataframe_by_hours, fit_and_predict_linear_eq, split_train_test, smooth_data
+from data_processing import filter_dataframe_by_hours, fit_and_predict_linear_eq, split_train_test
 from datetime import datetime
 
 
@@ -29,7 +29,6 @@ def create_figure(data_list, title):
 # Function to generate equation string
 def generate_equation_str(coef, intercept, toggle_value):
     coef = coef.flatten().tolist()
-    # equation_terms = [f"{c:.2f}*x{i + 1}" for i, c in enumerate(coef)]
     equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} {toggle_value[i][5:].lower()}" for i, c in enumerate(coef)]
     return f"Equation: {intercept[0]:.2f}  {' '.join(equation_terms)}"
 
@@ -53,15 +52,14 @@ def create_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis_tit
     ], style={'width': '48%', 'display': 'inline-block', 'margin-right': '10px'})
 
 
-def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str, diff_col, train_fig_title, test_fig_title, options):
+def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str, diff_col,
+                                  train_fig_title, test_fig_title, options):
     # Convert test_date_str to datetime
     test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
 
     # Split data based on selected test date
     train_df, test_df = split_train_test(df, test_date)
-
-    train_df = smooth_data(train_df)
-    test_df = smooth_data(test_df)
+    # train_df, test_df = smooth_data(train_df), smooth_data(test_df)
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
@@ -76,13 +74,18 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
     equation_str = "No equation to display"
 
     if toggle_value:
-        y_pred_train, rmse_train, max_err_train, coef, intercept = fit_and_predict_linear_eq(model_type, toggle_value, trained_df_filtered, diff_col, options)
-        y_pred_test, rmse_test, max_err_test, _, _ = fit_and_predict_linear_eq(model_type, toggle_value, test_df_filtered, diff_col, options)
+        y_pred_train, rmse_train, max_err_train, coef, intercept = (
+            fit_and_predict_linear_eq(model_type, toggle_value, trained_df_filtered, diff_col, options))
+        y_pred_test, rmse_test, max_err_test, _, _ = (
+            fit_and_predict_linear_eq(model_type, toggle_value, test_df_filtered, diff_col, options))
 
-        train_data_list.append(generate_scatter_plot(trained_df_filtered['timestamp'].values, y_pred_train, 'red',
-                                                     f"prediction<br>rmse: {rmse_train:.2f}<br>max err: {max_err_train:.2f}"))
-        test_data_list.append(generate_scatter_plot(test_df_filtered['timestamp'].values, y_pred_test, 'orange',
-                                                    f"prediction<br>rmse: {rmse_test:.2f}<br>max err: {max_err_test:.2f}"))
+        train_data_list.append(generate_scatter_plot(
+            trained_df_filtered['timestamp'].values, y_pred_train, 'red',
+            f"prediction<br>rmse: {rmse_train:.2f}<br>max err: {max_err_train:.2f}"))
+        test_data_list.append(generate_scatter_plot(
+            test_df_filtered['timestamp'].values, y_pred_test, 'orange',
+            f"prediction<br>rmse: {rmse_test:.2f}<br>max err: {max_err_test:.2f}"))
+
         if model_type == 'LR':
             equation_str = generate_equation_str(coef, intercept, toggle_value)
 

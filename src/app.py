@@ -3,7 +3,8 @@ import dash_bootstrap_components as dbc
 from io import BytesIO
 from zipfile import ZipFile
 
-from data_processing import load_csv, preprocess_data, split_train_test, get_column_list, smooth_data, filter_dataframe_by_hours
+from data_processing import (load_csv, preprocess_data, split_train_test,
+                             get_column_list, smooth_data, filter_dataframe_by_hours)
 from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
 from get_ip import get_wired_interface_ip
 import numpy as np
@@ -25,20 +26,19 @@ raw_df = load_csv(FILENAME)
 
 # Preprocess data
 processed_df = preprocess_data(raw_df)
+processed_df = smooth_data(processed_df)
 
 # List all unique dates in the dataframe
 unique_dates = np.sort(processed_df['date'].unique())[:-1]
 # Format dates as strings
 formatted_dates = [date.strftime('%Y/%m/%d') for date in unique_dates]
-# print("All unique dates in the dataframe:", formatted_dates)
-
 # Create dropdown options
 dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
 
-# # Split data into training and test datasets
+# Split data into training and test datasets
 train_df, test_df = split_train_test(processed_df, formatted_dates[-1])
-train_df = smooth_data(train_df)
-test_df = smooth_data(test_df)
+# train_df = smooth_data(train_df)
+# test_df = smooth_data(test_df)
 
 # Assume col_list is a list of column names from your DataFrame
 col_list = get_column_list(processed_df)
@@ -50,10 +50,6 @@ model_type_options = [
     {'label': 'XGBoost', 'value': 'XGB'},
 ]
 
-html.Button('Save Data as CSV', id='save-csv-btn', n_clicks=0),
-dcc.Download(id='download-train-csv'),
-dcc.Download(id='download-test-csv'),
-
 
 # === Dash App Initialization ===
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
@@ -64,13 +60,16 @@ app.layout = html.Div([
     html.H3('Predictive Model Dashboard'),
 
     html.Button('Download Data as ZIP', id='download-zip-btn',
-                style={'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white", "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}),
+                style={'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white",
+                       "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}),
     dcc.Download(id='download-zip'),
 
     html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between'}, children=[
         # First column
         html.Div([
+
             html.Div([
+
                 html.Label('Choose Model Type:',
                            style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold',
                                   "color": "white"}),
@@ -95,7 +94,8 @@ app.layout = html.Div([
                 value=[],
                 style={'display': 'block', 'margin': '5px', 'fontWeight': 'bold'},
                 inputStyle={"margin-right": "5px", "cursor": "pointer"},
-                labelStyle={"display": "block", "margin": "5px", "color": "white", "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
+                labelStyle={"display": "block", "margin": "5px", "color": "white",
+                            "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
             ),
 
             html.Br(),
@@ -115,6 +115,7 @@ app.layout = html.Div([
             html.Br(),
 
             html.Div([
+
                 html.Label('Select Ending Hour:',
                            style={'display': 'inline-block', 'margin-right': '10px',  'width': '150px'}),
                 dcc.Dropdown(
@@ -142,7 +143,7 @@ app.layout = html.Div([
 
         ], style={'width': '10%', 'display': 'inline-block', 'verticalAlign': 'top'}),
 
-        # Second column (Combining Second and Third rows)
+        # Second column
         html.Div([
             html.Div(id='equation-display-2', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential Y motion)', 'train-diff-2-4',
