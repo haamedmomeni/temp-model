@@ -77,9 +77,11 @@ def split_train_test(df, test_date_str):
     # Split the data based on the start and end timestamps
     # Train data: before the test period
     train_df = df[(df['timestamp'] <= start_timestamp) | (df['timestamp'] >= end_timestamp)].copy()
+    # train_df = df[(df['timestamp'] <= start_timestamp)].copy()
 
     # Test data: within the test period
     test_df = df[(df['timestamp'] > start_timestamp) & (df['timestamp'] < end_timestamp)].copy()
+    # test_df = df[(df['timestamp'] > start_timestamp)].copy()
 
     return train_df, test_df
 
