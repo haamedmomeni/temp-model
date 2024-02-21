@@ -1,7 +1,9 @@
 import plotly.graph_objs as go
 from dash import dcc, html
-from data_processing import filter_dataframe_by_hours, fit_and_predict_linear_eq, split_train_test
+from data_processing import filter_dataframe_by_hours, fit_and_predict_training_data, split_train_test, \
+    predict_test_data
 from datetime import datetime
+import pandas as pd
 
 
 def generate_scatter_plot(x_array, y_array, color, name):
@@ -71,13 +73,15 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
                                             test_df_filtered[diff_col].values,
                                             'green', 'observation')]
 
+
     equation_str = "No equation to display"
 
     if toggle_value:
-        y_pred_train, rmse_train, max_err_train, coef, intercept = (
-            fit_and_predict_linear_eq(model_type, toggle_value, trained_df_filtered, diff_col, options))
-        y_pred_test, rmse_test, max_err_test, _, _ = (
-            fit_and_predict_linear_eq(model_type, toggle_value, test_df_filtered, diff_col, options))
+        model, y_pred_train, rmse_train, max_err_train, coef, intercept = (
+            fit_and_predict_training_data(model_type, toggle_value, trained_df_filtered, diff_col, options))
+        y_pred_test, rmse_test, max_err_test = (
+            predict_test_data(model,toggle_value, test_df_filtered, diff_col, options))
+            # fit_and_predict_training_data(model_type, toggle_value, test_df_filtered, diff_col, options))
 
         train_data_list.append(generate_scatter_plot(
             trained_df_filtered['timestamp'].values, y_pred_train, 'red',

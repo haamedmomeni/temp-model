@@ -1,14 +1,23 @@
 import pandas as pd
 import numpy as np
 from sklearn.linear_model import LinearRegression
-from sklearn.metrics import mean_squared_error, max_error
+from sklearn.neighbors import KNeighborsRegressor
+from sklearn.ensemble import RandomForestRegressor
 import xgboost as xg
+from sklearn.svm import SVR
+from sklearn.metrics import mean_squared_error, max_error
+
+
+import tensorflow as tf
+from tensorflow.keras.models import Sequential
+from tensorflow.keras.layers import SimpleRNN, Dense
 
 
 def load_csv(file_path):
     df = pd.read_csv(file_path)
     df.drop([0, 1], inplace=True)
     df.dropna(inplace=True)
+    df = df.iloc[::10, :]
     return df
 
 
@@ -19,28 +28,27 @@ def preprocess_data(df):
                 df[col] = df[col].astype(float)
             except ValueError:
                 pass
-                # print(f"Cannot convert column {col} to float.")
+                # Log or handle columns that cannot be converted to float
+    df['timestamp'] = pd.to_datetime(df['timestamp'])  # Convert the 'timestamp' column to datetime
 
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
     df['date'] = df['timestamp'].dt.date
     df['time'] = df['timestamp'].dt.time
 
     df['difference_1_3'] = df.iloc[:, 3] - df.iloc[:, 1]
     df['difference_2_4'] = df.iloc[:, 4] - df.iloc[:, 2]
 
-    df = add_reference_columns(df, 18, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
-    df = add_reference_columns(df, 18, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
+    df = add_reference_column_at_hour_start(df, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
+    df = add_reference_column_at_hour_start(df, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
 
-    # Drop intermediate columns if necessary
-    df.drop(columns=['time'], inplace=True)
     return df
 
 
-def smooth_data(df, window=5):
+def smooth_data(df, window=1):
     for column in df.select_dtypes(include=[np.number]).columns:
         df[f'smoothed_{column}'] = df[column].rolling(window=window).mean()
 
     # Keep only columns that start with 'smoothed_'
+    # But exclude 'date', 'time', and 'timestamp' columns
     # This includes creating a list of columns to drop that don't start with 'smoothed_'
     cols_to_drop = [col for col in df.columns if not col.startswith('smoothed_')
                     and col not in ['date', 'time', 'timestamp']]
@@ -48,21 +56,6 @@ def smooth_data(df, window=5):
 
     return df
 
-
-# def split_train_test(df):
-#     unique_dates = np.sort(df['date'].unique())
-#     last_date = unique_dates[-1]
-#     day_before_last = unique_dates[-2]
-#
-#     # Define the cutoff timestamp: 6 PM of the day before the last date
-#     cutoff_timestamp = pd.Timestamp(year=day_before_last.year, month=day_before_last.month,
-#                                     day=day_before_last.day, hour=18, minute=0, second=0)
-#
-#     # Split the data based on the cutoff timestamp
-#     train_df = df[df['timestamp'] <= cutoff_timestamp].copy()
-#     test_df = df[df['timestamp'] > cutoff_timestamp].copy()
-#
-#     return train_df, test_df
 
 def split_train_test(df, test_date_str):
     # Convert test_date_str to a datetime.date object
@@ -117,6 +110,24 @@ def filter_dataframe_by_hours(df, start_hour, end_hour):
     return df_filtered
 
 
+def add_reference_column_at_hour_start(df, col_name, new_col_name):
+    n_hours = 1/2
+    # Calculate the total number of seconds since a fixed point (e.g., 1970-01-01)
+    # Then divide by the number of seconds in n hours, floor the result, and multiply back
+    seconds_per_n_hours = n_hours * 3600
+    df['hour_start'] = pd.to_datetime(
+        ((df['timestamp'].astype('int64') // 1e9 // seconds_per_n_hours) * seconds_per_n_hours).astype('int64') * 1e9)
+
+    # Create a dataframe with the first value of the specified column at the start of each hour
+    df_first_value_each_hour = df.groupby('hour_start')[col_name].first().reset_index()
+    df_first_value_each_hour.rename(columns={col_name: new_col_name}, inplace=True)
+    # Merge this dataframe back to the original dataframe on 'hour_start'
+    new_df = pd.merge(df, df_first_value_each_hour, on='hour_start', how='left')
+    # Drop the 'hour_start' column if it's no longer needed
+    new_df.drop(columns=['hour_start'], inplace=True)
+    return new_df
+
+
 def add_reference_columns(df, hour, col_name, new_col_name):
 
     # Convert hour to a time object
@@ -151,7 +162,8 @@ def add_reference_columns(df, hour, col_name, new_col_name):
     return new_df
 
 
-def fit_and_predict_linear_eq(model_type, toggle_value, training_df, col, options):
+def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options):
+    reshape = False
     # Create a mapping dictionary from value to label
     value_to_label = {option['value']: option['label'] for option in options}
 
@@ -165,26 +177,72 @@ def fit_and_predict_linear_eq(model_type, toggle_value, training_df, col, option
     X = df_selected[col_names[:-1]].to_numpy()
     y = df_selected[col].values.reshape(-1, 1)
 
-    # Select the model
-    # model_type = "XG"  # "LR"
-    if model_type == "XGB":
-        # model = xg.XGBRegressor(objective='reg:squarederror', n_estimators=20, seed=123)
+    # Select the model ["LR", "KNN", "XGB", "RNN"]
+    if model_type == "LR":
+        model = LinearRegression()
+
+    elif model_type == "KNN":
+        model = KNeighborsRegressor(n_neighbors=1)
+
+    elif model_type == "XGB":
         model = xg.XGBRegressor(
             objective='reg:squarederror',
-            n_estimators=20,  # Increased number of trees
+            n_estimators=500,  # Increased number of trees
             # learning_rate=0.1,  # Lower learning rate
-            # max_depth=5,  # Limiting tree depth
+            max_depth=2,  # Limiting tree depth
             # min_child_weight=1,
             subsample=0.8,
             colsample_bytree=0.8,
             gamma=0,
             seed=123
         )
-    else:
-        model = LinearRegression()
 
-    # Fit the model
-    model.fit(X, y)
+    elif model_type == "RF":
+        model = RandomForestRegressor(
+            n_estimators=100,  # Total number of trees to generate (can be adjusted)
+            max_depth=5,  # Adjust this as necessary to suit your data/problem
+            random_state=42  # For reproducibility
+            # , min_samples_split=2,  # Minimum samples needed to split a node
+            # , min_samples_leaf=1,  # Minimum samples needed to be at a leaf node
+            # , bootstrap=True  # Method of re-sampling for each new tree
+            # , oob_score=False  # If out-of-bag score to use
+            # , n_jobs=-1  # Number of cores to be used in parallel, -1 will use all available
+        )
+
+    elif model_type == "RNN":
+        n_features = X.shape[1]
+        reshape = True
+        X_reshaped = X.reshape((X.shape[0], 1, X.shape[1]))
+        model = Sequential([
+            SimpleRNN(20, activation='relu', input_shape=(5, n_features)),  # 20 units, input shape = (time steps, features)
+            Dense(1)  # Output layer with 1 unit for regression task
+        ])
+
+        # Compile the model
+        model.compile(optimizer='adam', loss='mean_squared_error')
+
+        # Print model summary
+        model.summary()
+
+    elif model_type == "SVM":
+        model = SVR(
+            kernel='rbf',  # Radial Basis Function kernel; consider 'linear', 'poly', for others.
+            C=0.01,
+            # Regularization parameter: tradeoff between smooth decision boundary
+            # and classifying all training points correctly
+            epsilon=0.1,  # Specifies the epsilon-tube within which no penalty is associated in the training loss
+            gamma='scale'
+            # Kernel coefficient for 'rbf', 'poly', and 'sigmoid'. If 'gamma'='scale', 1/(n_features * X.var())
+        )
+
+    if reshape:
+        # Train the model
+        model.fit(X_reshaped, y, epochs=10, batch_size=32)
+    if model_type in ["SVM", "RF"]:
+        model.fit(X, y.ravel())
+    else:
+        # Fit the model
+        model.fit(X, y)
 
     # Predict the values of y (target variable)
     y_pred = model.predict(X).ravel()  # Flatten the array
@@ -195,7 +253,45 @@ def fit_and_predict_linear_eq(model_type, toggle_value, training_df, col, option
     # Calculate the maximum error
     max_err = max_error(y, y_pred)
 
-    if model_type == "XGB":
-        return y_pred, rmse, max_err, 0, 0
+    if model_type == "LR":
+        return model, y_pred, rmse, max_err, model.coef_, model.intercept_
     else:
-        return y_pred, rmse, max_err, model.coef_, model.intercept_
+        return model, y_pred, rmse, max_err, 0, 0
+
+
+def predict_test_data(model, toggle_value, test_df, col, options):
+    # Create a mapping dictionary from value to label
+    value_to_label = {option['value']: option['label'] for option in options}
+
+    # Precompute the column names you'll need, including the target column to ensure alignment
+    col_names = [f'smoothed_{value_to_label[value]}' for value in toggle_value] + [col]
+
+    # Select the relevant columns from 'test_df' and drop rows with any NaN values to ensure alignment
+    df_selected = test_df[col_names]  # .dropna()
+
+    # Separate X and y after ensuring they are aligned
+    X = df_selected[col_names[:-1]].to_numpy()
+    y = df_selected[col].values.reshape(-1, 1)
+
+    # Predict the values of y (target variable)
+    y_pred = model.predict(X).ravel()  # Flatten the array
+
+    # y_pred = rolling_mean_with_padding(y_pred, 50)
+
+    # Calculate RMSE
+    rmse = mean_squared_error(y, y_pred, squared=False)
+
+    # Calculate the maximum error
+    max_err = max_error(y, y_pred)
+
+    return y_pred, rmse, max_err
+
+def rolling_mean_with_padding(arr, window):
+    """Calculate the rolling mean of a numpy array, with padding."""
+    ret = np.cumsum(arr, dtype=float)
+    ret[window:] = ret[window:] - ret[:-window]
+    rolling_mean = ret[window - 1:] / window
+    # Pad with NaNs to keep the original array size
+    padding = np.empty(window-1)
+    padding.fill(np.nan)
+    return np.concatenate((padding, rolling_mean))

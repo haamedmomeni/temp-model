@@ -8,17 +8,7 @@ from data_processing import (load_csv, preprocess_data, split_train_test,
 from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
 from get_ip import get_wired_interface_ip
 import numpy as np
-# import pandas as pd
 
-# df1 = load_csv('src/2024-01-10.csv')
-# df2 = load_csv('src/2024-01-13.csv')
-#
-# processed_df1 = preprocess_data(df1)
-# processed_df2 = preprocess_data(df2)
-#
-# processed_df1[['difference_1_3', 'difference_2_4']] = -processed_df1[['difference_1_3', 'difference_2_4']]
-#
-# processed_df = pd.concat([processed_df1, processed_df2], ignore_index=True)
 
 # Load data
 FILENAME = '2024-01-10_v2.csv'
@@ -27,6 +17,7 @@ raw_df = load_csv(FILENAME)
 # Preprocess data
 processed_df = preprocess_data(raw_df)
 processed_df = smooth_data(processed_df)
+
 
 # List all unique dates in the dataframe
 unique_dates = np.sort(processed_df['date'].unique())[:-1]
@@ -47,7 +38,10 @@ options = [{'label': col, 'value': f'SHOW_{col.upper().replace(" ", "_")}'} for 
 
 model_type_options = [
     {'label': 'Linear Regression', 'value': 'LR'},
+    {'label': 'K-Nearest Neighbors', 'value': 'KNN'},
     {'label': 'XGBoost', 'value': 'XGB'},
+    {'label': 'Random Forest', 'value': 'RF'},
+    {'label': 'Support Vector Machine', 'value': 'SVM'},
 ]
 
 
@@ -228,9 +222,10 @@ def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
 
         # Filter columns based on selected options
         selected_columns = (['timestamp'] +
-                            [value_to_label[value] for value in toggle_value] +
+                            ['smoothed_'+value_to_label[value] for value in toggle_value] +
                             ['smoothed_difference_1_3', 'smoothed_difference_2_4'])
-
+        print(selected_columns)
+        print(trained_df_filtered.columns)
         # Create in-memory ZIP file
         zip_buffer = BytesIO()
         with ZipFile(zip_buffer, 'w') as zip_file:
