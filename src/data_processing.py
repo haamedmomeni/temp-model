@@ -191,9 +191,9 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
     elif model_type == "XGB":
         model = xg.XGBRegressor(
             objective='reg:squarederror',
-            n_estimators=500,  # Increased number of trees
+            n_estimators=100,  # Increased number of trees
             # learning_rate=0.1,  # Lower learning rate
-            max_depth=2,  # Limiting tree depth
+            max_depth=3,  # Limiting tree depth
             # min_child_weight=1,
             subsample=0.8,
             colsample_bytree=0.8,
