@@ -17,7 +17,7 @@ def load_csv(file_path):
     df = pd.read_csv(file_path)
     df.drop([0, 1], inplace=True)
     df.dropna(inplace=True)
-    df = df.iloc[::10, :]
+    df = df.iloc[::5, :]
     return df
 
 
@@ -36,9 +36,12 @@ def preprocess_data(df):
 
     df['difference_1_3'] = df.iloc[:, 3] - df.iloc[:, 1]
     df['difference_2_4'] = df.iloc[:, 4] - df.iloc[:, 2]
-
-    df = add_reference_column_at_hour_start(df, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
-    df = add_reference_column_at_hour_start(df, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
+    # drop rows that the date is January 26th
+    df = df[df['date'] != pd.to_datetime('2024-01-26').date()]
+    # df = add_reference_column_at_hour_start(df, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
+    # df = add_reference_column_at_hour_start(df, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
+    df = add_reference_columns(df, 18, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
+    df = add_reference_columns(df, 18, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
 
     return df
 
@@ -94,7 +97,7 @@ def get_column_list(df):
     items_to_remove = ['timestamp', 'Reference Mirror X-Motion', 'Reference Mirror Y-Motion',
                        'Motorized Mirror X-Motion', 'Motorized Mirror Y-Motion',
                        'Differential X-Motion', 'Differential Y-Motion',
-                       'difference_1_3', 'difference_2_4', 'date']
+                       'difference_1_3', 'difference_2_4', 'date', 'time']
     # col_list = [item for item in col_list if item not in items_to_remove] # and not item.startswith('smoothed')]
     col_list = [item.replace('smoothed_', '') for item in col_list
                 if item.replace('smoothed_', '') not in items_to_remove]
@@ -111,7 +114,7 @@ def filter_dataframe_by_hours(df, start_hour, end_hour):
 
 
 def add_reference_column_at_hour_start(df, col_name, new_col_name):
-    n_hours = 1/2
+    n_hours = 24
     # Calculate the total number of seconds since a fixed point (e.g., 1970-01-01)
     # Then divide by the number of seconds in n hours, floor the result, and multiply back
     seconds_per_n_hours = n_hours * 3600
@@ -143,6 +146,7 @@ def add_reference_columns(df, hour, col_name, new_col_name):
     df_first_after_hour = df_first_after_hour[['date', col_name]]
     df_first_after_hour.rename(columns={col_name: f'{col_name}_at_6'}, inplace=True)
     df_first_after_hour[f'{col_name}_at_6_yesterday'] = df_first_after_hour[f'{col_name}_at_6'].shift(1)
+    df_first_after_hour.iloc[-1, 1:2] = df_first_after_hour.iloc[-2, 1:2]
 
     # Merge the new column with the original DataFrame
     new_df = pd.merge(df, df_first_after_hour, on='date', how='left')
