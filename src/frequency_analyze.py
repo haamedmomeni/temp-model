@@ -10,7 +10,21 @@ import seaborn as sns
 FILE_PATH_TRAIN = 'train_data.csv'
 NUM_COLORS = 8  # Adjust based on the number of conditions you have
 COLOR_PALETTE = sns.color_palette("flare", NUM_COLORS)
-TARGET_COLUMN = 'smoothed_difference_2_4'  # smoothed_difference_2_4
+TARGET_COLUMN_X = 'smoothed_difference_1_3'
+TARGET_COLUMN_Y = 'smoothed_difference_2_4'
+PLOT_NAME = 'alignment_frequency'
+ERROR_TYPE = 'euclidean'  # 'euclidean', 'x', 'y'
+
+
+def calculate_misalignment_error(error_type, x, y, x_pred, y_pred):
+    if error_type == 'euclidean':
+        return ((x_pred - x) ** 2 + (y_pred - y) ** 2) ** 0.5
+    elif error_type == 'x':
+        return x_pred - x
+    elif error_type == 'y':
+        return y_pred - y
+    else:
+        raise ValueError('Invalid type')
 
 
 def add_reference_column_at_hour_start(df, column_name, new_column_name, hours=1):
@@ -31,7 +45,8 @@ def add_reference_column_at_hour_start(df, column_name, new_column_name, hours=1
 # Load and preprocess data
 df_train = pd.read_csv(FILE_PATH_TRAIN)
 df_train['timestamp'] = pd.to_datetime(df_train['timestamp'])
-y_train = df_train[TARGET_COLUMN].values.reshape(-1, 1)
+x = df_train[TARGET_COLUMN_X].values.reshape(-1, 1)
+y = df_train[TARGET_COLUMN_Y].values.reshape(-1, 1)
 
 # Analysis parameters
 n_hours_range = np.arange(1/6, 5, 1/6)  # From 0.5 to 6 hours, in half-hour increments
@@ -42,9 +57,12 @@ fig, axs = plt.subplots(1, 2, figsize=(12, 4))
 
 # First subplot for error distributions
 for i, n_hours in enumerate(n_hours_range):
-    temp_df = add_reference_column_at_hour_start(df_train.copy(), TARGET_COLUMN, 'ref', n_hours)
-    y_pred_train = temp_df['ref'].values.reshape(-1, 1)
-    errors = y_train - y_pred_train
+    temp_df = add_reference_column_at_hour_start(df_train.copy(), TARGET_COLUMN_Y, 'ref_y', n_hours)
+    temp_df = add_reference_column_at_hour_start(temp_df, TARGET_COLUMN_X, 'ref_x', n_hours)
+    x_pred = temp_df['ref_x'].values.reshape(-1, 1)
+    y_pred = temp_df['ref_y'].values.reshape(-1, 1)
+
+    errors = calculate_misalignment_error(ERROR_TYPE, x, y, x_pred, y_pred)
     std_val = np.std(errors)
     max_val = np.max(np.abs(errors))
     std_values.append(std_val)
@@ -52,13 +70,16 @@ for i, n_hours in enumerate(n_hours_range):
 
     # Plot for specific intervals
     if any(np.isclose(n_hours, target_hour, atol=1e-2) for target_hour in [1/6, 2/6, 3/6, 1, 2, 4]):
-        sns.kdeplot(errors.flatten(), color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min, std={std_val:.2f}', linewidth=2, ax=axs[0])
+        sns.histplot(errors.flatten(), binwidth=0.025, element='step', fill=False, color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min, std={std_val:.3f}', linewidth=2, ax=axs[0])
 
 axs[0].legend(title='Frequency of alignment each ', loc='best')
 axs[0].set_title('PDF of misalignment errors')
 axs[0].set_xlabel('Error (pixels, ~1 mas)')
 axs[0].set_ylabel('Density')
-axs[0].set_xlim(-1, 1)
+if ERROR_TYPE == 'euclidean':
+    axs[0].set_xlim(-.1, 2)
+else:
+    axs[0].set_xlim(-1, 1)
 
 # Second subplot for Std and Max Error over time
 n_minutes_range = n_hours_range * 60
@@ -79,5 +100,25 @@ axs[1].set_title('Misalignment error over different realignment frequencies')
 axs[1].grid(True)
 
 plt.tight_layout()
-plt.savefig(f"{TARGET_COLUMN}_analyze.jpg")
+plt.savefig(f"{PLOT_NAME}_analyze.jpg")
+plt.show()
+
+figure = plt.figure(figsize=(12, 4))
+n_hours = 1/6
+
+y_train = df_train[TARGET_COLUMN_Y].values.reshape(-1, 1)
+y_pred_train = temp_df['ref_y'].values.reshape(-1, 1)
+errors = y_train - y_pred_train
+plt.scatter(df_train['timestamp'], y_pred_train - y_train, marker='.', color='blue', linestyle='-')
+
+y_train = df_train[TARGET_COLUMN_X].values.reshape(-1, 1)
+y_pred_train = temp_df['ref_x'].values.reshape(-1, 1)
+errors = y_train - y_pred_train
+plt.scatter(df_train['timestamp'], y_pred_train - y_train, marker='.', color='red', linestyle='-')
+
+y_train = (df_train[TARGET_COLUMN_Y].values.reshape(-1, 1) ** 2 + df_train[TARGET_COLUMN_X].values.reshape(-1, 1) ** 2) ** 0.5
+y_pred_train = (temp_df['ref_x'].values.reshape(-1, 1) ** 2 + temp_df['ref_y'].values.reshape(-1, 1) ** 2) ** 0.5
+errors = y_train - y_pred_train
+plt.scatter(df_train['timestamp'], y_pred_train - y_train, marker='.', color='green', linestyle='-')
+
 plt.show()
