@@ -8,9 +8,9 @@ from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, max_error
 
 
-import tensorflow as tf
-from tensorflow.keras.models import Sequential
-from tensorflow.keras.layers import SimpleRNN, Dense
+# import tensorflow as tf
+# from tensorflow.keras.models import Sequential
+# from tensorflow.keras.layers import SimpleRNN, Dense
 
 
 def load_csv(file_path):
@@ -213,20 +213,20 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
             # , n_jobs=-1  # Number of cores to be used in parallel, -1 will use all available
         )
 
-    elif model_type == "RNN":
-        n_features = X.shape[1]
-        reshape = True
-        X_reshaped = X.reshape((X.shape[0], 1, X.shape[1]))
-        model = Sequential([
-            SimpleRNN(20, activation='relu', input_shape=(5, n_features)),  # 20 units, input shape = (time steps, features)
-            Dense(1)  # Output layer with 1 unit for regression task
-        ])
-
-        # Compile the model
-        model.compile(optimizer='adam', loss='mean_squared_error')
-
-        # Print model summary
-        model.summary()
+    # elif model_type == "RNN":
+    #     n_features = X.shape[1]
+    #     reshape = True
+    #     X_reshaped = X.reshape((X.shape[0], 1, X.shape[1]))
+    #     model = Sequential([
+    #         SimpleRNN(20, activation='relu', input_shape=(5, n_features)),  # 20 units, input shape = (time steps, features)
+    #         Dense(1)  # Output layer with 1 unit for regression task
+    #     ])
+    #
+    #     # Compile the model
+    #     model.compile(optimizer='adam', loss='mean_squared_error')
+    #
+    #     # Print model summary
+    #     model.summary()
 
     elif model_type == "SVM":
         model = SVR(
