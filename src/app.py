@@ -5,7 +5,8 @@ from zipfile import ZipFile
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
                              get_column_list, smooth_data, filter_dataframe_by_hours)
-from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions, update_error_graphs_list
+from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions, update_error_graphs_list, \
+    create_err_graph_div
 from get_ip import get_wired_interface_ip
 import numpy as np
 
@@ -177,12 +178,12 @@ app.layout = html.Div([
                                                    'red', 'observation'),
                              y_axis_title='Smoothed Difference 1-3'),
             ########
-            create_graph_div('Training Data (error)', 'train-error',
+            create_err_graph_div('Training Data (error)', 'train-error-plot',
                              generate_scatter_plot(train_df['timestamp'].values,
                                                    train_df['smoothed_difference_1_3'].values,
                                                    'blue', 'observation'),
                              y_axis_title='Smoothed Difference 1-3'),
-            create_graph_div('Testing Data (error)', 'test-error',
+            create_err_graph_div('Testing Data (error)', 'test-error-plot',
                              generate_scatter_plot(test_df['timestamp'].values,
                                                    test_df['smoothed_difference_1_3'].values,
                                                    'red', 'observation'),
@@ -234,9 +235,22 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type, test_
                                          'Test Data: Smoothed Difference (Column 4 - Column 2)',
                                          options)
 
-def update_error_graphs(model_type, toggle_value, start_hour, end_hour, test_date_str, interval):
+
+@app.callback(
+    [Output('train-error-plot', 'figure'),
+     Output('test-error-plot', 'figure')],
+    [Input('toggle-data', 'value'),
+     Input('start-hour-input', 'value'),
+     Input('end-hour-input', 'value'),
+     Input('model-type-toggle', 'value'),
+     Input('test-date-dropdown', 'value'),
+     Input('interval-selection-dropdown', 'value')
+     ]
+)
+def update_error_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
     processed_df = update_processed_data(interval)
     return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str, options)
+
 
 @app.callback(
     Output('download-zip', 'data'),
@@ -277,12 +291,6 @@ def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
         return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
 
 
-# @app.callback(
-#     [Output('train-diff-1-3', 'figure'),
-#      Output('test-diff-1-3', 'figure'),
-#      Output('equation-display-1', 'children')],
-#     [Input('interval-selection-dropdown', 'value')]
-# )
 def update_processed_data(interval):
     # Re-load raw data if needed, or use it if already available in memory
     raw_df = load_csv(FILENAME)  # Consider optimizing this to avoid reloading

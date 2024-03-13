@@ -169,19 +169,20 @@ def add_reference_columns(df, hour, col_name, new_col_name):
 
 # this function add a reference column to the dataframe indicating the value of each column repeating every n minutes
 def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_name, interval):
+    new_df = df.copy()
     # Calculate the interval condition
     condition = (df['timestamp'].dt.minute % interval) == 0
     # Initialize the new column with NaNs
-    df[new_col_name] = pd.NA
+    new_df[new_col_name] = pd.NA
     # Set the value in the new column where the condition is true
-    df.loc[condition, new_col_name] = df.loc[condition, col_name]
+    new_df.loc[condition, new_col_name] = new_df.loc[condition, col_name]
     # Forward fill the new column to propagate the last valid observation
-    df[new_col_name] = df[new_col_name].ffill()
+    new_df[new_col_name] = new_df[new_col_name].ffill()
 
-    df.dropna(subset=[new_col_name], inplace=True)
-    df[new_col_name] = df[new_col_name].astype(float)
+    new_df.dropna(subset=[new_col_name], inplace=True)
+    new_df[new_col_name] = new_df[new_col_name].astype(float)
 
-    return df
+    return new_df
 
 
 def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options):
