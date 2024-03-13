@@ -17,11 +17,12 @@ def load_csv(file_path):
     df = pd.read_csv(file_path)
     df.drop([0, 1], inplace=True)
     df.dropna(inplace=True)
-    df = df.iloc[::5, :]
+    df = df.drop_duplicates(subset=['timestamp'], keep='first')
+    # df = df.iloc[::5, :]
     return df
 
 
-def preprocess_data(df):
+def preprocess_data(df, interval=60):
     for col in df.columns:
         if df[col].dtype == 'object':
             try:
@@ -40,16 +41,16 @@ def preprocess_data(df):
     df = df[df['date'] != pd.to_datetime('2024-01-26').date()]
     # df = add_reference_column_at_hour_start(df, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
     # df = add_reference_column_at_hour_start(df, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
-    df = add_reference_columns(df, 18, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
-    df = add_reference_columns(df, 18, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
-
+    # df = add_reference_columns(df, 18, 'difference_1_3', 'refX')  # For 'difference_1_3' at 6 PM
+    # df = add_reference_columns(df, 18, 'difference_2_4', 'refY')  # For 'difference_2_4' at 6 PM
+    df = add_reference_column_at_periodic_interval_optimized(df, 'difference_1_3', 'refX', interval)
+    df = add_reference_column_at_periodic_interval_optimized(df, 'difference_2_4', 'refY', interval)
     return df
 
 
 def smooth_data(df, window=1):
     for column in df.select_dtypes(include=[np.number]).columns:
         df[f'smoothed_{column}'] = df[column].rolling(window=window).mean()
-
     # Keep only columns that start with 'smoothed_'
     # But exclude 'date', 'time', and 'timestamp' columns
     # This includes creating a list of columns to drop that don't start with 'smoothed_'
@@ -164,6 +165,23 @@ def add_reference_columns(df, hour, col_name, new_col_name):
     new_df.drop(columns=[f'{col_name}_at_6', f'{col_name}_at_6_yesterday'], inplace=True)
 
     return new_df
+
+
+# this function add a reference column to the dataframe indicating the value of each column repeating every n minutes
+def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_name, interval):
+    # Calculate the interval condition
+    condition = (df['timestamp'].dt.minute % interval) == 0
+    # Initialize the new column with NaNs
+    df[new_col_name] = pd.NA
+    # Set the value in the new column where the condition is true
+    df.loc[condition, new_col_name] = df.loc[condition, col_name]
+    # Forward fill the new column to propagate the last valid observation
+    df[new_col_name] = df[new_col_name].ffill()
+
+    df.dropna(subset=[new_col_name], inplace=True)
+    df[new_col_name] = df[new_col_name].astype(float)
+
+    return df
 
 
 def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options):
@@ -289,6 +307,7 @@ def predict_test_data(model, toggle_value, test_df, col, options):
     max_err = max_error(y, y_pred)
 
     return y_pred, rmse, max_err
+
 
 def rolling_mean_with_padding(arr, window):
     """Calculate the rolling mean of a numpy array, with padding."""

@@ -13,7 +13,7 @@ COLOR_PALETTE = sns.color_palette("flare", NUM_COLORS)
 TARGET_COLUMN_X = 'smoothed_difference_1_3'
 TARGET_COLUMN_Y = 'smoothed_difference_2_4'
 PLOT_NAME = 'alignment_frequency'
-ERROR_TYPE = 'euclidean'  # 'euclidean', 'x', 'y'
+ERROR_TYPE = 'y'  # 'euclidean', 'x', 'y'
 
 
 def calculate_misalignment_error(error_type, x, y, x_pred, y_pred):
@@ -74,7 +74,7 @@ for i, n_hours in enumerate(n_hours_range):
 
 axs[0].legend(title='Frequency of alignment each ', loc='best')
 axs[0].set_title('PDF of misalignment errors')
-axs[0].set_xlabel('Error (pixels, ~1 mas)')
+axs[0].set_xlabel('Error (pixels, ~1 arcsec)')
 axs[0].set_ylabel('Density')
 if ERROR_TYPE == 'euclidean':
     axs[0].set_xlim(-.1, 2)
@@ -85,12 +85,12 @@ else:
 n_minutes_range = n_hours_range * 60
 line1 = axs[1].plot(n_minutes_range, std_values, label='Std', marker='o', color='blue', linestyle='-')
 axs[1].set_xlabel('Frequency of realignment (each x minutes)')
-axs[1].set_ylabel('Std (pixels, ~1 mas)', color='blue')
+axs[1].set_ylabel('Std (pixels, ~1 arcsec)', color='blue')
 axs[1].tick_params(axis='y', labelcolor='blue')
 
 ax2 = axs[1].twinx()
 line2 = ax2.plot(n_minutes_range, max_error_values, label='Max Error', marker='x', color='red', linestyle='--')
-ax2.set_ylabel('Max error (pixels, ~1 mas)', color='red')
+ax2.set_ylabel('Max error (pixels, ~1 arcsec)', color='red')
 ax2.tick_params(axis='y', labelcolor='red')
 
 lines = line1 + [line2[0]]

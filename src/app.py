@@ -5,7 +5,7 @@ from zipfile import ZipFile
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
                              get_column_list, smooth_data, filter_dataframe_by_hours)
-from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
+from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions, update_error_graphs_list
 from get_ip import get_wired_interface_ip
 import numpy as np
 
@@ -28,8 +28,6 @@ dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
 
 # Split data into training and test datasets
 train_df, test_df = split_train_test(processed_df, formatted_dates[-1])
-# train_df = smooth_data(train_df)
-# test_df = smooth_data(test_df)
 
 # Assume col_list is a list of column names from your DataFrame
 col_list = get_column_list(processed_df)
@@ -94,6 +92,23 @@ app.layout = html.Div([
 
             html.Br(),
 
+            html.Div([
+                html.Label('Select Realignment Interval (for refX & refY):',
+                           style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
+                dcc.Dropdown(
+                    id='interval-selection-dropdown',
+                    options=[
+                        {'label': '10 minutes', 'value': 10},
+                        {'label': '20 minutes', 'value': 20},
+                        {'label': '30 minutes', 'value': 30},
+                        {'label': '1 hour', 'value': 60},
+                        # Add more options as needed
+                    ],
+                    value=10,  # Default value
+                    clearable=False,
+                    style={'width': '200px', 'display': 'inline-block', 'color': 'black'}
+                ),
+            ], style={'margin-bottom': '20px'}),
             html.Div([
                 html.Label('Select Starting Hour:',
                            style={'display': 'inline-block', 'margin-right': '10px',  'width': '150px'}),
@@ -160,7 +175,19 @@ app.layout = html.Div([
                              generate_scatter_plot(test_df['timestamp'].values,
                                                    test_df['smoothed_difference_1_3'].values,
                                                    'red', 'observation'),
+                             y_axis_title='Smoothed Difference 1-3'),
+            ########
+            create_graph_div('Training Data (error)', 'train-error',
+                             generate_scatter_plot(train_df['timestamp'].values,
+                                                   train_df['smoothed_difference_1_3'].values,
+                                                   'blue', 'observation'),
+                             y_axis_title='Smoothed Difference 1-3'),
+            create_graph_div('Testing Data (error)', 'test-error',
+                             generate_scatter_plot(test_df['timestamp'].values,
+                                                   test_df['smoothed_difference_1_3'].values,
+                                                   'red', 'observation'),
                              y_axis_title='Smoothed Difference 1-3')
+            ########
         ], style={'width': '90%', 'display': 'inline-block'}),
     ]),
 ])
@@ -174,10 +201,12 @@ app.layout = html.Div([
      Input('start-hour-input', 'value'),
      Input('end-hour-input', 'value'),
      Input('model-type-toggle', 'value'),
-     Input('test-date-dropdown', 'value')
+     Input('test-date-dropdown', 'value'),
+     Input('interval-selection-dropdown', 'value')
      ]
 )
-def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str):
+def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
+    processed_df = update_processed_data(interval)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str,
                                          'smoothed_difference_1_3',
                                          'Training Data: Smoothed Difference (Column 3 - Column 1)',
@@ -193,15 +222,21 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type, test_
      Input('start-hour-input', 'value'),
      Input('end-hour-input', 'value'),
      Input('model-type-toggle', 'value'),
-     Input('test-date-dropdown', 'value')]
+     Input('test-date-dropdown', 'value'),
+     Input('interval-selection-dropdown', 'value')
+     ]
 )
-def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str):
+def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
+    processed_df = update_processed_data(interval)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str,
                                          'smoothed_difference_2_4',
                                          'Training Data: Smoothed Difference (Column 4 - Column 2)',
                                          'Test Data: Smoothed Difference (Column 4 - Column 2)',
                                          options)
 
+def update_error_graphs(model_type, toggle_value, start_hour, end_hour, test_date_str, interval):
+    processed_df = update_processed_data(interval)
+    return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str, options)
 
 @app.callback(
     Output('download-zip', 'data'),
@@ -242,9 +277,28 @@ def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
         return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
 
 
+# @app.callback(
+#     [Output('train-diff-1-3', 'figure'),
+#      Output('test-diff-1-3', 'figure'),
+#      Output('equation-display-1', 'children')],
+#     [Input('interval-selection-dropdown', 'value')]
+# )
+def update_processed_data(interval):
+    # Re-load raw data if needed, or use it if already available in memory
+    raw_df = load_csv(FILENAME)  # Consider optimizing this to avoid reloading
+
+    # Update the call to your preprocess function with the selected interval
+    processed_df = preprocess_data(raw_df, interval=interval)  # Adjust function signature as needed
+    processed_df = smooth_data(processed_df)
+
+    return processed_df
+
+
 # === Run the App ===
 if __name__ == '__main__':
     # ip_address = get_wired_interface_ip()
     # app.run_server(debug=True, host=f"{ip_address}",
     #                port=8050)
     app.run_server(debug=True)
+
+
