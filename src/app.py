@@ -1,4 +1,5 @@
 from dash import Dash, dcc, html, Input, Output, State
+import dash
 import dash_bootstrap_components as dbc
 from io import BytesIO
 from zipfile import ZipFile
@@ -16,7 +17,7 @@ FILENAME = '2024-01-10_v2.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
-processed_df = preprocess_data(raw_df)
+processed_df = preprocess_data(raw_df, 0)
 processed_df = smooth_data(processed_df)
 
 
@@ -80,7 +81,9 @@ app.layout = html.Div([
 
             html.Label('Temperatures:',
                        style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
-
+            html.Br(),
+            html.Button('Select All', id='select-all', n_clicks=0),
+            html.Button('Deselect All', id='deselect-all', n_clicks=0),
             dcc.Checklist(
                 id='toggle-data',
                 options=options,
@@ -103,9 +106,15 @@ app.layout = html.Div([
                         {'label': '20 minutes', 'value': 20},
                         {'label': '30 minutes', 'value': 30},
                         {'label': '1 hour', 'value': 60},
+                        {'label': '2 hours', 'value': 120},
+                        {'label': '3 hours', 'value': 180},
+                        {'label': '4 hours', 'value': 240},
+                        {'label': '6 hours', 'value': 360},
+                        {'label': '8 hours', 'value': 480},
+                        {'label': 'None', 'value': 0},
                         # Add more options as needed
                     ],
-                    value=10,  # Default value
+                    value=0,  # Default value
                     clearable=False,
                     style={'width': '200px', 'display': 'inline-block', 'color': 'black'}
                 ),
@@ -144,6 +153,32 @@ app.layout = html.Div([
                            style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
                 dcc.Dropdown(
                     id='test-date-dropdown',
+                    options=dropdown_options,
+                    value=formatted_dates[-1],  # Default value
+                    clearable=False,
+                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
+                ),
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+
+            html.Br(),
+
+            html.Div([
+                html.Label('Select Starting Date for Train:',
+                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
+                dcc.Dropdown(
+                    id='train-date-start-dropdown',
+                    options=dropdown_options,
+                    value=formatted_dates[-1],  # Default value
+                    clearable=False,
+                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
+                ),
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+
+            html.Div([
+                html.Label('Select Ending Date for Train:',
+                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
+                dcc.Dropdown(
+                    id='train-date-end-dropdown',
                     options=dropdown_options,
                     value=formatted_dates[-1],  # Default value
                     clearable=False,
@@ -203,15 +238,19 @@ app.layout = html.Div([
      Input('end-hour-input', 'value'),
      Input('model-type-toggle', 'value'),
      Input('test-date-dropdown', 'value'),
+     Input('train-date-start-dropdown', 'value'),
+     Input('train-date-end-dropdown', 'value'),
      Input('interval-selection-dropdown', 'value')
      ]
 )
-def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
+def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type,
+                           test_date_str, train_date_start_str, train_date_end_str, interval):
     processed_df = update_processed_data(interval)
-    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str,
+    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
+                                         test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_difference_1_3',
-                                         'Training Data: Smoothed Difference (Column 3 - Column 1)',
-                                         'Test Data: Smoothed Difference (Column 3 - Column 1)',
+                                         'Training Data: Smoothed Difference',
+                                         'Test Data: Smoothed Difference',
                                          options)
 
 
@@ -224,15 +263,19 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type, test_
      Input('end-hour-input', 'value'),
      Input('model-type-toggle', 'value'),
      Input('test-date-dropdown', 'value'),
+     Input('train-date-start-dropdown', 'value'),
+     Input('train-date-end-dropdown', 'value'),
      Input('interval-selection-dropdown', 'value')
      ]
 )
-def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
+def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
+                           test_date_str, train_date_start_str, train_date_end_str, interval):
     processed_df = update_processed_data(interval)
-    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str,
+    return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
+                                         test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_difference_2_4',
-                                         'Training Data: Smoothed Difference (Column 4 - Column 2)',
-                                         'Test Data: Smoothed Difference (Column 4 - Column 2)',
+                                         'Training Data: Smoothed Difference',
+                                         'Test Data: Smoothed Difference',
                                          options)
 
 
@@ -273,8 +316,7 @@ def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
         selected_columns = (['timestamp'] +
                             ['smoothed_'+value_to_label[value] for value in toggle_value] +
                             ['smoothed_difference_1_3', 'smoothed_difference_2_4'])
-        print(selected_columns)
-        print(trained_df_filtered.columns)
+
         # Create in-memory ZIP file
         zip_buffer = BytesIO()
         with ZipFile(zip_buffer, 'w') as zip_file:
@@ -296,11 +338,31 @@ def update_processed_data(interval):
     raw_df = load_csv(FILENAME)  # Consider optimizing this to avoid reloading
 
     # Update the call to your preprocess function with the selected interval
-    processed_df = preprocess_data(raw_df, interval=interval)  # Adjust function signature as needed
+    processed_df = preprocess_data(raw_df, interval)  # Adjust function signature as needed
     processed_df = smooth_data(processed_df)
 
     return processed_df
 
+@app.callback(
+    Output('toggle-data', 'value'),
+    [Input('select-all', 'n_clicks'),
+     Input('deselect-all', 'n_clicks')],
+    [State('toggle-data', 'options')]
+)
+def update_checklist(select_all_clicks, deselect_all_clicks, options):
+    ctx = dash.callback_context
+
+    if not ctx.triggered:
+        button_id = 'No clicks yet'
+    else:
+        button_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
+    if button_id == 'select-all':
+        return [option['value'] for option in options]
+    elif button_id == 'deselect-all':
+        return []
+
+    return dash.no_update
 
 # === Run the App ===
 if __name__ == '__main__':

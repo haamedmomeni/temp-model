@@ -76,24 +76,28 @@ def create_err_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis
     ], style={'width': '48%', 'display': 'inline-block', 'margin-right': '10px'})
 
 
-def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str, diff_col,
+def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str,
+                                  train_date_start_str, train_date_end_str, diff_col,
                                   train_fig_title, test_fig_title, options):
     # Convert test_date_str to datetime
     test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
 
     # Split data based on selected test date
-    train_df, test_df = split_train_test(df, test_date)
-    # train_df, test_df = smooth_data(train_df), smooth_data(test_df)
+    train_df, test_df = split_train_test(df, test_date, train_date_start_str, train_date_end_str)
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+    y_train = trained_df_filtered[diff_col].values
+    y_test = test_df_filtered[diff_col].values
+    y_train_std = np.std(y_train)
+    y_test_std = np.std(y_test)
 
     train_data_list = [generate_scatter_plot(trained_df_filtered['timestamp'].values,
-                                             trained_df_filtered[diff_col].values,
-                                             'blue', 'observation')]
+                                             y_train,
+                                             'blue', f'observation<br>Std: {y_train_std:.3f}')]
     test_data_list = [generate_scatter_plot(test_df_filtered['timestamp'].values,
                                             test_df_filtered[diff_col].values,
-                                            'green', 'observation')]
+                                            'green', f'observation<br>Std: {y_test_std:.3f}')]
 
     equation_str = "No equation to display"
 
@@ -158,8 +162,8 @@ def update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, df,
                  ('smoothed_difference_1_3', 'blue', ["X", "Y"])]
     if toggle_value:
         for diff_col, color, labels in diff_cols:
-            a, b = process_and_plot_errors(model_type, toggle_value, trained_df_filtered, test_df_filtered, diff_col, options, color,
-                             labels)
+            a, b = process_and_plot_errors(model_type, toggle_value, trained_df_filtered, test_df_filtered,
+                                           diff_col, options, color, labels)
             train_data_list.append(a)
             test_data_list.append(b)
 
