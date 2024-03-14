@@ -16,6 +16,7 @@ from sklearn.metrics import mean_squared_error, max_error
 def load_csv(file_path):
     df = pd.read_csv(file_path)
     df.drop([0, 1], inplace=True)
+    df = df.ffill()
     df.dropna(inplace=True)
     df = df.drop_duplicates(subset=['timestamp'], keep='first')
     # df = df.iloc[::5, :]
@@ -43,9 +44,9 @@ def preprocess_data(df, interval):
         df = add_reference_column_at_periodic_interval_optimized(df, 'difference_1_3', 'refX', interval)
         df = add_reference_column_at_periodic_interval_optimized(df, 'difference_2_4', 'refY', interval)
         df['difference_1_3'] = df['difference_1_3'] - df['refX']
-        df.drop('refX', axis=1, inplace=True)
+        # df.drop('refX', axis=1, inplace=True)
         df['difference_2_4'] = df['difference_2_4'] - df['refY']
-        df.drop('refY', axis=1, inplace=True)
+        # df.drop('refY', axis=1, inplace=True)
 
     return df
 
@@ -85,9 +86,14 @@ def split_train_test(df, test_date_str, train_date_start=None, train_date_end=No
     test_df = df[(df['timestamp'] > start_timestamp) & (df['timestamp'] < end_timestamp)].copy()
 
     if train_date_start and train_date_end:
-        train_date_start = pd.to_datetime(train_date_start).date()
-        train_date_end = pd.to_datetime(train_date_end).date()
-        train_df = train_df[(train_df['timestamp'].dt.date >= train_date_start) & (train_df['timestamp'].dt.date <= train_date_end)]
+        train_date_start = (pd.Timestamp(pd.to_datetime(train_date_start).date())
+                            + pd.Timedelta(days=0, hours=18))
+        train_date_end = (pd.Timestamp(pd.to_datetime(train_date_end).date())
+                          + pd.Timedelta(days=0, hours=18))
+        # train_date_start = pd.to_datetime(train_date_start).date()
+        # train_date_end = pd.to_datetime(train_date_end).date()
+        train_df = train_df[(train_df['timestamp'] >= train_date_start) &
+                            (train_df['timestamp'] <= train_date_end)]
 
     return train_df, test_df
 
@@ -132,7 +138,8 @@ def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_na
         condition = (df['timestamp'].dt.minute % interval) == 0
     else:
         interval = interval // 60
-        condition = (df['timestamp'].dt.minute == 0) & (df['timestamp'].dt.hour % interval == 0)
+        condition = ((df['timestamp'].dt.minute == 0) &
+                     (df['timestamp'].dt.hour % interval == 20 % interval))
     # Initialize the new column with NaNs
     new_df[new_col_name] = pd.NA
     # Set the value in the new column where the condition is true
@@ -147,6 +154,19 @@ def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_na
 
 
 def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options):
+    # if no option is selected, the reference value will be used as the prediction
+    if len(toggle_value) == 0:
+        y = training_df[col].values.reshape(-1, 1)
+        y_pred = np.zeros(training_df.shape[0])
+
+        # Calculate RMSE
+        rmse = mean_squared_error(y, y_pred, squared=False)
+
+        # Calculate the maximum error
+        max_err = max_error(y, y_pred)
+
+        return 'ref', y_pred, rmse, max_err, 0, 0
+
     reshape = False
     # Create a mapping dictionary from value to label
     value_to_label = {option['value']: option['label'] for option in options}
@@ -244,6 +264,18 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
 
 
 def predict_test_data(model, toggle_value, test_df, col, options):
+    if model == 'ref':
+        y = test_df[col].values.reshape(-1, 1)
+        y_pred = np.zeros(test_df.shape[0])
+
+        # Calculate RMSE
+        rmse = mean_squared_error(y, y_pred, squared=False)
+
+        # Calculate the maximum error
+        max_err = max_error(y, y_pred)
+
+        return y_pred, rmse, max_err
+
     # Create a mapping dictionary from value to label
     value_to_label = {option['value']: option['label'] for option in options}
 
@@ -271,12 +303,12 @@ def predict_test_data(model, toggle_value, test_df, col, options):
     return y_pred, rmse, max_err
 
 
-def rolling_mean_with_padding(arr, window):
-    """Calculate the rolling mean of a numpy array, with padding."""
-    ret = np.cumsum(arr, dtype=float)
-    ret[window:] = ret[window:] - ret[:-window]
-    rolling_mean = ret[window - 1:] / window
-    # Pad with NaNs to keep the original array size
-    padding = np.empty(window-1)
-    padding.fill(np.nan)
-    return np.concatenate((padding, rolling_mean))
+# def rolling_mean_with_padding(arr, window):
+#     """Calculate the rolling mean of a numpy array, with padding."""
+#     ret = np.cumsum(arr, dtype=float)
+#     ret[window:] = ret[window:] - ret[:-window]
+#     rolling_mean = ret[window - 1:] / window
+#     # Pad with NaNs to keep the original array size
+#     padding = np.empty(window-1)
+#     padding.fill(np.nan)
+#     return np.concatenate((padding, rolling_mean))

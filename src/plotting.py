@@ -87,35 +87,41 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
-    y_train = trained_df_filtered[diff_col].values
-    y_test = test_df_filtered[diff_col].values
+    t_trian = trained_df_filtered['timestamp'].values
+    t_test = test_df_filtered['timestamp'].values
+    if diff_col == 'smoothed_difference_2_4':
+        col_ref = 'smoothed_refY'
+    else:
+        col_ref = 'smoothed_refX'
+    y_train = trained_df_filtered[diff_col].values + trained_df_filtered[col_ref].values
+    y_test = test_df_filtered[diff_col].values + test_df_filtered[col_ref].values
+
     y_train_std = np.std(y_train)
     y_test_std = np.std(y_test)
 
-    train_data_list = [generate_scatter_plot(trained_df_filtered['timestamp'].values,
-                                             y_train,
+    train_data_list = [generate_scatter_plot(t_trian, y_train,
                                              'blue', f'observation<br>Std: {y_train_std:.3f}')]
-    test_data_list = [generate_scatter_plot(test_df_filtered['timestamp'].values,
-                                            test_df_filtered[diff_col].values,
+    test_data_list = [generate_scatter_plot(t_test, y_test,
                                             'green', f'observation<br>Std: {y_test_std:.3f}')]
 
     equation_str = "No equation to display"
 
-    if toggle_value:
+    if True:
         model, y_pred_train, rmse_train, max_err_train, coef, intercept = (
             fit_and_predict_training_data(model_type, toggle_value, trained_df_filtered, diff_col, options))
         y_pred_test, rmse_test, max_err_test = (
             predict_test_data(model, toggle_value, test_df_filtered, diff_col, options))
             # fit_and_predict_training_data(model_type, toggle_value, test_df_filtered, diff_col, options))
 
-        train_data_list.append(generate_scatter_plot(
-            trained_df_filtered['timestamp'].values, y_pred_train, 'red',
+        y_pred_train = y_pred_train + trained_df_filtered[col_ref].values
+        y_pred_test = y_pred_test + test_df_filtered[col_ref].values
+
+        train_data_list.append(generate_scatter_plot(t_trian, y_pred_train, 'red',
             f"prediction<br>rmse: {rmse_train:.3f}<br>max err: {max_err_train:.2f}"))
-        test_data_list.append(generate_scatter_plot(
-            test_df_filtered['timestamp'].values, y_pred_test, 'orange',
+        test_data_list.append(generate_scatter_plot(t_test, y_pred_test, 'orange',
             f"prediction<br>rmse: {rmse_test:.3f}<br>max err: {max_err_test:.2f}"))
 
-        if model_type == 'LR':
+        if model_type == 'LR' and len(toggle_value) > 1:
             equation_str = generate_equation_str(coef, intercept, toggle_value)
 
     return (create_figure(train_data_list, train_fig_title),

@@ -44,6 +44,23 @@ model_type_options = [
     {'label': 'Support Vector Machine', 'value': 'SVM'},
 ]
 
+interval_options = [
+    {'label': '10 minutes', 'value': 10},
+    {'label': '20 minutes', 'value': 20},
+    {'label': '30 minutes', 'value': 30},
+    {'label': '1 hour', 'value': 60},
+    {'label': '2 hours', 'value': 120},
+    {'label': '3 hours', 'value': 180},
+    {'label': '4 hours', 'value': 240},
+    {'label': '6 hours', 'value': 360},
+    {'label': '8 hours', 'value': 480},
+    {'label': '12 hours', 'value': 720},
+    {'label': 'None', 'value': 0}
+]
+
+button_style = {'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white",
+                "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
+
 
 # === Dash App Initialization ===
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
@@ -53,9 +70,7 @@ server = app.server
 app.layout = html.Div([
     html.H3('Predictive Model Dashboard'),
 
-    html.Button('Download Data as ZIP', id='download-zip-btn',
-                style={'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white",
-                       "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}),
+    html.Button('Download Data as ZIP', id='download-zip-btn', style=button_style),
     dcc.Download(id='download-zip'),
 
     html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between'}, children=[
@@ -82,8 +97,12 @@ app.layout = html.Div([
             html.Label('Temperatures:',
                        style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
             html.Br(),
-            html.Button('Select All', id='select-all', n_clicks=0),
-            html.Button('Deselect All', id='deselect-all', n_clicks=0),
+            html.Div(
+                children=[
+                    html.Button('Select All', id='select-all', n_clicks=0, style=button_style),
+                    html.Button('Deselect All', id='deselect-all', n_clicks=0, style=button_style)
+                ],
+                style={'display': 'flex', 'flexDirection': 'row'}),
             dcc.Checklist(
                 id='toggle-data',
                 options=options,
@@ -101,20 +120,8 @@ app.layout = html.Div([
                            style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
                 dcc.Dropdown(
                     id='interval-selection-dropdown',
-                    options=[
-                        {'label': '10 minutes', 'value': 10},
-                        {'label': '20 minutes', 'value': 20},
-                        {'label': '30 minutes', 'value': 30},
-                        {'label': '1 hour', 'value': 60},
-                        {'label': '2 hours', 'value': 120},
-                        {'label': '3 hours', 'value': 180},
-                        {'label': '4 hours', 'value': 240},
-                        {'label': '6 hours', 'value': 360},
-                        {'label': '8 hours', 'value': 480},
-                        {'label': 'None', 'value': 0},
-                        # Add more options as needed
-                    ],
-                    value=0,  # Default value
+                    options=interval_options,
+                    value=720,  # Default value
                     clearable=False,
                     style={'width': '200px', 'display': 'inline-block', 'color': 'black'}
                 ),
@@ -149,26 +156,12 @@ app.layout = html.Div([
             html.Br(),
 
             html.Div([
-                html.Label('Select Test Date:',
-                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
-                dcc.Dropdown(
-                    id='test-date-dropdown',
-                    options=dropdown_options,
-                    value=formatted_dates[-1],  # Default value
-                    clearable=False,
-                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
-
-            html.Br(),
-
-            html.Div([
                 html.Label('Select Starting Date for Train:',
                            style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
                 dcc.Dropdown(
                     id='train-date-start-dropdown',
                     options=dropdown_options,
-                    value=formatted_dates[-1],  # Default value
+                    value=formatted_dates[-5],  # Default value
                     clearable=False,
                     style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
                 ),
@@ -179,6 +172,20 @@ app.layout = html.Div([
                            style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
                 dcc.Dropdown(
                     id='train-date-end-dropdown',
+                    options=dropdown_options,
+                    value=formatted_dates[-2],  # Default value
+                    clearable=False,
+                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
+                ),
+            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+
+            html.Br(),
+
+            html.Div([
+                html.Label('Select Test Date:',
+                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
+                dcc.Dropdown(
+                    id='test-date-dropdown',
                     options=dropdown_options,
                     value=formatted_dates[-1],  # Default value
                     clearable=False,
@@ -213,16 +220,16 @@ app.layout = html.Div([
                                                    'red', 'observation'),
                              y_axis_title='Smoothed Difference 1-3'),
             ########
-            create_err_graph_div('Training Data (error)', 'train-error-plot',
-                             generate_scatter_plot(train_df['timestamp'].values,
-                                                   train_df['smoothed_difference_1_3'].values,
-                                                   'blue', 'observation'),
-                             y_axis_title='Smoothed Difference 1-3'),
-            create_err_graph_div('Testing Data (error)', 'test-error-plot',
-                             generate_scatter_plot(test_df['timestamp'].values,
-                                                   test_df['smoothed_difference_1_3'].values,
-                                                   'red', 'observation'),
-                             y_axis_title='Smoothed Difference 1-3')
+            # create_err_graph_div('Training Data (error)', 'train-error-plot',
+            #                  generate_scatter_plot(train_df['timestamp'].values,
+            #                                        train_df['smoothed_difference_1_3'].values,
+            #                                        'blue', 'observation'),
+            #                  y_axis_title='Smoothed Difference 1-3'),
+            # create_err_graph_div('Testing Data (error)', 'test-error-plot',
+            #                  generate_scatter_plot(test_df['timestamp'].values,
+            #                                        test_df['smoothed_difference_1_3'].values,
+            #                                        'red', 'observation'),
+            #                  y_axis_title='Smoothed Difference 1-3')
             ########
         ], style={'width': '90%', 'display': 'inline-block'}),
     ]),
@@ -279,20 +286,20 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
                                          options)
 
 
-@app.callback(
-    [Output('train-error-plot', 'figure'),
-     Output('test-error-plot', 'figure')],
-    [Input('toggle-data', 'value'),
-     Input('start-hour-input', 'value'),
-     Input('end-hour-input', 'value'),
-     Input('model-type-toggle', 'value'),
-     Input('test-date-dropdown', 'value'),
-     Input('interval-selection-dropdown', 'value')
-     ]
-)
-def update_error_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
-    processed_df = update_processed_data(interval)
-    return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str, options)
+# @app.callback(
+#     [Output('train-error-plot', 'figure'),
+#      Output('test-error-plot', 'figure')],
+#     [Input('toggle-data', 'value'),
+#      Input('start-hour-input', 'value'),
+#      Input('end-hour-input', 'value'),
+#      Input('model-type-toggle', 'value'),
+#      Input('test-date-dropdown', 'value'),
+#      Input('interval-selection-dropdown', 'value')
+#      ]
+# )
+# def update_error_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
+#     processed_df = update_processed_data(interval)
+#     return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str, options)
 
 
 @app.callback(
