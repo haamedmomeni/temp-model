@@ -164,8 +164,8 @@ def update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, df,
     train_data_list, test_data_list = [], []
 
     # Use the function for both sets of columns
-    diff_cols = [('smoothed_difference_2_4', 'red', ["Y", "X"]),
-                 ('smoothed_difference_1_3', 'blue', ["X", "Y"])]
+    diff_cols = [('smoothed_diffY', 'red', ["Y", "X"]),
+                 ('smoothed_diffX', 'blue', ["X", "Y"])]
     if toggle_value:
         for diff_col, color, labels in diff_cols:
             a, b = process_and_plot_errors(model_type, toggle_value, trained_df_filtered, test_df_filtered,

@@ -6,10 +6,17 @@ from zipfile import ZipFile
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
                              get_column_list, smooth_data, filter_dataframe_by_hours)
-from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions, update_error_graphs_list, \
-    create_err_graph_div
+from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
 from get_ip import get_wired_interface_ip
 import numpy as np
+
+
+def generate_dropdown(label, id, options, value, style, label_style, div_style):
+    """Generates a div containing a label and a dropdown."""
+    return html.Div([
+        html.Label(label, style=label_style),
+        dcc.Dropdown(id=id, options=options, value=value, clearable=False, style=style),
+    ], style=div_style)
 
 
 # Load data
@@ -61,6 +68,13 @@ interval_options = [
 button_style = {'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white",
                 "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
 
+label_style = {'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold', "color": "white"}
+
+div_style = {'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}
+
+dropdown_style = {'width': '110px', 'display': 'inline-block', 'color': 'black'}
+
+hour_options = [{'label': f'{i} AM' if i < 12 else f'{i} PM', 'value': i} for i in range(24)]
 
 # === Dash App Initialization ===
 app = Dash(__name__, external_stylesheets=[dbc.themes.DARKLY])
@@ -79,14 +93,12 @@ app.layout = html.Div([
 
             html.Div([
 
-                html.Label('Choose Model Type:',
-                           style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold',
-                                  "color": "white"}),
+                html.Label('Choose Model Type:', style=label_style),
 
                 dcc.RadioItems(
                     id='model-type-toggle',
                     options=model_type_options,
-                    value='LR',  # Default value
+                    value='LR',
                     labelStyle={'display': 'block', "color": "white", "background-color": "#3B3B3B", "padding": "5px",
                                 "border-radius": "5px", "margin": "5px"},
                     style={'fontWeight': 'bold'}
@@ -94,8 +106,7 @@ app.layout = html.Div([
             ],
                 style={'padding': '10px', 'background-color': '#2D2D2D', 'border-radius': '5px'}),
 
-            html.Label('Temperatures:',
-                       style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
+            html.Label('Temperatures:', style=label_style),
             html.Br(),
             html.Div(
                 children=[
@@ -113,85 +124,19 @@ app.layout = html.Div([
                             "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
             ),
 
-            html.Br(),
-
-            html.Div([
-                html.Label('Select Realignment Interval (for refX & refY):',
-                           style={'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold'}),
-                dcc.Dropdown(
-                    id='interval-selection-dropdown',
-                    options=interval_options,
-                    value=720,  # Default value
-                    clearable=False,
-                    style={'width': '200px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'margin-bottom': '20px'}),
-            html.Div([
-                html.Label('Select Starting Hour:',
-                           style={'display': 'inline-block', 'margin-right': '10px',  'width': '150px'}),
-                dcc.Dropdown(
-                    id='start-hour-input',
-                    options=[{'label': f'{i} AM' if i < 12 else f'{i} PM', 'value': i} for i in range(24)],
-                    value=20,  # Default value
-                    clearable=False,
-                    style={'width': '80px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
-
-            html.Br(),
-
-            html.Div([
-
-                html.Label('Select Ending Hour:',
-                           style={'display': 'inline-block', 'margin-right': '10px',  'width': '150px'}),
-                dcc.Dropdown(
-                    id='end-hour-input',
-                    options=[{'label': f'{i} AM' if i < 12 else f'{i} PM', 'value': i} for i in range(24)],
-                    value=6,  # Default value
-                    clearable=False,
-                    style={'width': '80px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
-
-            html.Br(),
-
-            html.Div([
-                html.Label('Select Starting Date for Train:',
-                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
-                dcc.Dropdown(
-                    id='train-date-start-dropdown',
-                    options=dropdown_options,
-                    value=formatted_dates[-5],  # Default value
-                    clearable=False,
-                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
-
-            html.Div([
-                html.Label('Select Ending Date for Train:',
-                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
-                dcc.Dropdown(
-                    id='train-date-end-dropdown',
-                    options=dropdown_options,
-                    value=formatted_dates[-2],  # Default value
-                    clearable=False,
-                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
-
-            html.Br(),
-
-            html.Div([
-                html.Label('Select Test Date:',
-                           style={'display': 'inline-block', 'margin-right': '10px', 'width': '120px'}),
-                dcc.Dropdown(
-                    id='test-date-dropdown',
-                    options=dropdown_options,
-                    value=formatted_dates[-1],  # Default value
-                    clearable=False,
-                    style={'width': '110px', 'display': 'inline-block', 'color': 'black'}
-                ),
-            ], style={'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}),
+            # Interval, Starting Hour, Ending Hour, and Date Selections
+            generate_dropdown('Select Realignment Interval (for refX & refY):', 'interval-selection-dropdown',
+                              interval_options, 720, dropdown_style, label_style, div_style),
+            generate_dropdown('Select Starting Hour:', 'start-hour-input',
+                              hour_options, 20, dropdown_style, label_style, div_style),
+            generate_dropdown('Select Ending Hour:', 'end-hour-input',
+                              hour_options, 6, dropdown_style, label_style, div_style),
+            generate_dropdown('Select Starting Date for Train:', 'train-date-start-dropdown',
+                              dropdown_options, formatted_dates[-5], dropdown_style, label_style, div_style),
+            generate_dropdown('Select Ending Date for Train:', 'train-date-end-dropdown',
+                              dropdown_options, formatted_dates[-2], dropdown_style, label_style, div_style),
+            generate_dropdown('Select Test Date:', 'test-date-dropdown',
+                              dropdown_options, formatted_dates[-1], dropdown_style, label_style, div_style),
 
         ], style={'width': '10%', 'display': 'inline-block', 'verticalAlign': 'top'}),
 
@@ -200,34 +145,34 @@ app.layout = html.Div([
             html.Div(id='equation-display-2', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential Y motion)', 'train-diff-2-4',
                              generate_scatter_plot(train_df['timestamp'].values,
-                                                   train_df['smoothed_difference_2_4'].values,
+                                                   train_df['smoothed_diffY'].values,
                                                    'green', 'observation'),
                              y_axis_title='Smoothed Difference 2-4'),
             create_graph_div('Testing Data (Differential Y motion)', 'test-diff-2-4',
                              generate_scatter_plot(test_df['timestamp'].values,
-                                                   test_df['smoothed_difference_2_4'].values,
+                                                   test_df['smoothed_diffY'].values,
                                                    'purple', 'observation'),
                              y_axis_title='Smoothed Difference 2-4'),
             html.Div(id='equation-display-1', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential X motion)', 'train-diff-1-3',
                              generate_scatter_plot(train_df['timestamp'].values,
-                                                   train_df['smoothed_difference_1_3'].values,
+                                                   train_df['smoothed_diffX'].values,
                                                    'blue', 'observation'),
                              y_axis_title='Smoothed Difference 1-3'),
             create_graph_div('Testing Data (Differential X motion)', 'test-diff-1-3',
                              generate_scatter_plot(test_df['timestamp'].values,
-                                                   test_df['smoothed_difference_1_3'].values,
+                                                   test_df['smoothed_diffX'].values,
                                                    'red', 'observation'),
                              y_axis_title='Smoothed Difference 1-3'),
             ########
             # create_err_graph_div('Training Data (error)', 'train-error-plot',
             #                  generate_scatter_plot(train_df['timestamp'].values,
-            #                                        train_df['smoothed_difference_1_3'].values,
+            #                                        train_df['smoothed_diffX'].values,
             #                                        'blue', 'observation'),
             #                  y_axis_title='Smoothed Difference 1-3'),
             # create_err_graph_div('Testing Data (error)', 'test-error-plot',
             #                  generate_scatter_plot(test_df['timestamp'].values,
-            #                                        test_df['smoothed_difference_1_3'].values,
+            #                                        test_df['smoothed_diffX'].values,
             #                                        'red', 'observation'),
             #                  y_axis_title='Smoothed Difference 1-3')
             ########
@@ -255,7 +200,7 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type,
     processed_df = update_processed_data(interval)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
-                                         'smoothed_difference_1_3',
+                                         'smoothed_diffX',
                                          'Training Data: Smoothed Difference',
                                          'Test Data: Smoothed Difference',
                                          options)
@@ -280,7 +225,7 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
     processed_df = update_processed_data(interval)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
-                                         'smoothed_difference_2_4',
+                                         'smoothed_diffY',
                                          'Training Data: Smoothed Difference',
                                          'Test Data: Smoothed Difference',
                                          options)
@@ -299,7 +244,8 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
 # )
 # def update_error_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
 #     processed_df = update_processed_data(interval)
-#     return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, processed_df, test_date_str, options)
+#     return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour,
+#     processed_df, test_date_str, options)
 
 
 @app.callback(
@@ -322,7 +268,7 @@ def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
         # Filter columns based on selected options
         selected_columns = (['timestamp'] +
                             ['smoothed_'+value_to_label[value] for value in toggle_value] +
-                            ['smoothed_difference_1_3', 'smoothed_difference_2_4'])
+                            ['smoothed_diffX', 'smoothed_diffY'])
 
         # Create in-memory ZIP file
         zip_buffer = BytesIO()
@@ -371,11 +317,10 @@ def update_checklist(select_all_clicks, deselect_all_clicks, options):
 
     return dash.no_update
 
+
 # === Run the App ===
 if __name__ == '__main__':
     # ip_address = get_wired_interface_ip()
     # app.run_server(debug=True, host=f"{ip_address}",
     #                port=8050)
     app.run_server(debug=True)
-
-
