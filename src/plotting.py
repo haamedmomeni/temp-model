@@ -23,7 +23,7 @@ def create_figure(data_list, title):
         'layout': go.Layout(
             title=title,
             xaxis={'title': 'Timestamp'},
-            yaxis={'title': 'Smoothed Difference 1-3'},
+            yaxis={'title': 'Motion (arcsec)'},
             uirevision='constant'
         )
     }
@@ -36,17 +36,14 @@ def generate_equation_str(coef, intercept, toggle_value):
     return f"Equation: {intercept[0]:.2f}  {' '.join(equation_terms)}"
 
 
-def create_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis_title=''):
+def create_graph_div(title, graph_id, data):
     return html.Div([
-        html.H4(title),
         dcc.Graph(
             id=graph_id,
             figure={
                 'data': [data],
                 'layout': go.Layout(
                     title=title,
-                    xaxis={'title': x_axis_title},
-                    yaxis={'title': y_axis_title},
                     paper_bgcolor='#2D2D2D',
                     plot_bgcolor='#2D2D2D'
                 )
@@ -55,123 +52,44 @@ def create_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis_tit
     ], style={'width': '48%', 'display': 'inline-block', 'margin-right': '10px'})
 
 
-def create_err_graph_div(title, graph_id, data, x_axis_title='Timestamp', y_axis_title=''):
-    return html.Div([
-        html.H4(title),
-        dcc.Graph(
-            id=graph_id,
-            figure={
-                'data': [data],
-                'layout': go.Layout(
-                    title=title,
-                    xaxis={'title': x_axis_title},
-                    yaxis={'title': y_axis_title},
-                    paper_bgcolor='#2D2D2D',
-                    plot_bgcolor='#2D2D2D',
-                    uirevision='constant'
-                )
-            },
-            style={'height': '250px'}
-        )
-    ], style={'width': '48%', 'display': 'inline-block', 'margin-right': '10px'})
-
-
 def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str,
                                   train_date_start_str, train_date_end_str, diff_col,
                                   train_fig_title, test_fig_title, options):
-    # Convert test_date_str to datetime
     test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
-
-    # Split data based on selected test date
     train_df, test_df = split_train_test(df, test_date, train_date_start_str, train_date_end_str)
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
-    t_trian = trained_df_filtered['timestamp'].values
+
+    t_train = trained_df_filtered['timestamp'].values
     t_test = test_df_filtered['timestamp'].values
-    if diff_col == 'smoothed_difference_2_4':
-        col_ref = 'smoothed_refY'
-    else:
-        col_ref = 'smoothed_refX'
+
+    col_ref = 'smoothed_refY' if diff_col == 'smoothed_difference_2_4' else 'smoothed_refX'
+
     y_train = trained_df_filtered[diff_col].values + trained_df_filtered[col_ref].values
     y_test = test_df_filtered[diff_col].values + test_df_filtered[col_ref].values
 
     y_train_std = np.std(y_train)
     y_test_std = np.std(y_test)
 
-    train_data_list = [generate_scatter_plot(t_trian, y_train,
-                                             'blue', f'observation<br>Std: {y_train_std:.3f}')]
-    test_data_list = [generate_scatter_plot(t_test, y_test,
-                                            'green', f'observation<br>Std: {y_test_std:.3f}')]
+    train_data_list = [generate_scatter_plot(t_train, y_train, 'blue', f'<b>Observation</b><br>std: {y_train_std:.3f}')]
+    test_data_list = [generate_scatter_plot(t_test, y_test, 'green', f'<b>Observation</b><br>std: {y_test_std:.3f}')]
+
+    model, y_pred_train, rmse_train, max_err_train, coef, intercept = fit_and_predict_training_data(
+        model_type, toggle_value, trained_df_filtered, diff_col, options)
+    y_pred_test, rmse_test, max_err_test = predict_test_data(
+        model, toggle_value, test_df_filtered, diff_col, options)
+
+    y_pred_train += trained_df_filtered[col_ref].values
+    y_pred_test += test_df_filtered[col_ref].values
+
+    train_data_list.append(generate_scatter_plot(t_train, y_pred_train, 'red',
+                                                 f"<b>Prediction</b><br>rmse: {rmse_train:.3f}<br>max err: {max_err_train:.2f}"))
+    test_data_list.append(generate_scatter_plot(t_test, y_pred_test, 'orange',
+                                                f"<b>Prediction</b><br>rmse: {rmse_test:.3f}<br>max err: {max_err_test:.2f}"))
 
     equation_str = "No equation to display"
+    if model_type == 'LR' and len(toggle_value) > 1:
+        equation_str = generate_equation_str(coef, intercept, toggle_value)
 
-    if True:
-        model, y_pred_train, rmse_train, max_err_train, coef, intercept = (
-            fit_and_predict_training_data(model_type, toggle_value, trained_df_filtered, diff_col, options))
-        y_pred_test, rmse_test, max_err_test = (
-            predict_test_data(model, toggle_value, test_df_filtered, diff_col, options))
-            # fit_and_predict_training_data(model_type, toggle_value, test_df_filtered, diff_col, options))
-
-        y_pred_train = y_pred_train + trained_df_filtered[col_ref].values
-        y_pred_test = y_pred_test + test_df_filtered[col_ref].values
-
-        train_data_list.append(generate_scatter_plot(t_trian, y_pred_train, 'red',
-            f"prediction<br>rmse: {rmse_train:.3f}<br>max err: {max_err_train:.2f}"))
-        test_data_list.append(generate_scatter_plot(t_test, y_pred_test, 'orange',
-            f"prediction<br>rmse: {rmse_test:.3f}<br>max err: {max_err_test:.2f}"))
-
-        if model_type == 'LR' and len(toggle_value) > 1:
-            equation_str = generate_equation_str(coef, intercept, toggle_value)
-
-    return (create_figure(train_data_list, train_fig_title),
-            create_figure(test_data_list, test_fig_title),
-            equation_str)
-
-
-def process_and_plot_errors(model_type, toggle_value, trained_df_filtered, test_df_filtered,
-                            diff_col, options, color, plot_labels):
-
-    # Extract y values for training and testing
-    y_train = trained_df_filtered[diff_col].values
-    y_test = test_df_filtered[diff_col].values
-
-    # Fit model and predict for training and testing datasets
-    model, y_pred_train, _, _, _, _ = fit_and_predict_training_data(model_type, toggle_value, trained_df_filtered,
-                                                                    diff_col, options)
-    y_pred_test, _, _ = predict_test_data(model, toggle_value, test_df_filtered, diff_col, options)
-
-    # Calculate errors
-    err_train = np.array(y_pred_train, dtype=float) - np.array(y_train, dtype=float)
-    err_test = np.array(y_pred_test, dtype=float) - np.array(y_test, dtype=float)
-
-    # Generate and append scatter plots for training and testing datasets
-    return (generate_scatter_plot(trained_df_filtered['timestamp'].values, err_train, color, plot_labels[0]),
-            generate_scatter_plot(test_df_filtered['timestamp'].values, err_test, color, plot_labels[1]))
-
-
-def update_error_graphs_list(model_type, toggle_value, start_hour, end_hour, df, test_date_str, options):
-
-    # Convert test_date_str to datetime
-    test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
-
-    # Split data based on selected test date
-    train_df, test_df = split_train_test(df, test_date)
-
-    trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
-    test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
-
-    train_data_list, test_data_list = [], []
-
-    # Use the function for both sets of columns
-    diff_cols = [('smoothed_diffY', 'red', ["Y", "X"]),
-                 ('smoothed_diffX', 'blue', ["X", "Y"])]
-    if toggle_value:
-        for diff_col, color, labels in diff_cols:
-            a, b = process_and_plot_errors(model_type, toggle_value, trained_df_filtered, test_df_filtered,
-                                           diff_col, options, color, labels)
-            train_data_list.append(a)
-            test_data_list.append(b)
-
-    return (create_figure(train_data_list, 'Error Train'),
-            create_figure(test_data_list, 'Error Test'))
+    return create_figure(train_data_list, train_fig_title), create_figure(test_data_list, test_fig_title), equation_str

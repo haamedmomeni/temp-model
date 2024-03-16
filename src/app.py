@@ -42,6 +42,7 @@ train_df, test_df = split_train_test(processed_df, formatted_dates[-1])
 col_list = get_column_list(processed_df)
 # Generate the options dynamically based on column names
 options = [{'label': col, 'value': f'SHOW_{col.upper().replace(" ", "_")}'} for col in col_list]
+options = sorted(options, key=lambda x: x['label'])
 
 model_type_options = [
     {'label': 'Linear Regression', 'value': 'LR'},
@@ -70,7 +71,7 @@ button_style = {'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "col
 
 label_style = {'display': 'inline-block', 'margin-right': '10px', 'fontWeight': 'bold', "color": "white"}
 
-div_style = {'display': 'flex', 'align-items': 'center', 'margin-right': '10px'}
+div_style = {'display': 'flex', 'align-items': 'center', 'margin-right': '10px', 'justifyContent': 'space-between'}
 
 dropdown_style = {'width': '110px', 'display': 'inline-block', 'color': 'black'}
 
@@ -84,7 +85,7 @@ server = app.server
 app.layout = html.Div([
     html.H3('Predictive Model Dashboard'),
 
-    html.Button('Download Data as ZIP', id='download-zip-btn', style=button_style),
+    html.Button('Download Data as .Zip File', id='download-zip-btn', style=button_style),
     dcc.Download(id='download-zip'),
 
     html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between'}, children=[
@@ -125,7 +126,7 @@ app.layout = html.Div([
             ),
 
             # Interval, Starting Hour, Ending Hour, and Date Selections
-            generate_dropdown('Select Realignment Interval (for refX & refY):', 'interval-selection-dropdown',
+            generate_dropdown('Select Realignment Interval (refX, refY):', 'interval-selection-dropdown',
                               interval_options, 720, dropdown_style, label_style, div_style),
             generate_dropdown('Select Starting Hour:', 'start-hour-input',
                               hour_options, 20, dropdown_style, label_style, div_style),
@@ -138,7 +139,7 @@ app.layout = html.Div([
             generate_dropdown('Select Test Date:', 'test-date-dropdown',
                               dropdown_options, formatted_dates[-1], dropdown_style, label_style, div_style),
 
-        ], style={'width': '10%', 'display': 'inline-block', 'verticalAlign': 'top'}),
+        ], style={'width': '15%', 'display': 'inline-block', 'verticalAlign': 'top'}),
 
         # Second column
         html.Div([
@@ -146,37 +147,21 @@ app.layout = html.Div([
             create_graph_div('Training Data (Differential Y motion)', 'train-diff-2-4',
                              generate_scatter_plot(train_df['timestamp'].values,
                                                    train_df['smoothed_diffY'].values,
-                                                   'green', 'observation'),
-                             y_axis_title='Smoothed Difference 2-4'),
+                                                   'green', 'Observation'),),
             create_graph_div('Testing Data (Differential Y motion)', 'test-diff-2-4',
                              generate_scatter_plot(test_df['timestamp'].values,
                                                    test_df['smoothed_diffY'].values,
-                                                   'purple', 'observation'),
-                             y_axis_title='Smoothed Difference 2-4'),
+                                                   'purple', 'Observation'),),
             html.Div(id='equation-display-1', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential X motion)', 'train-diff-1-3',
                              generate_scatter_plot(train_df['timestamp'].values,
                                                    train_df['smoothed_diffX'].values,
-                                                   'blue', 'observation'),
-                             y_axis_title='Smoothed Difference 1-3'),
+                                                   'blue', 'Observation'),),
             create_graph_div('Testing Data (Differential X motion)', 'test-diff-1-3',
                              generate_scatter_plot(test_df['timestamp'].values,
                                                    test_df['smoothed_diffX'].values,
-                                                   'red', 'observation'),
-                             y_axis_title='Smoothed Difference 1-3'),
-            ########
-            # create_err_graph_div('Training Data (error)', 'train-error-plot',
-            #                  generate_scatter_plot(train_df['timestamp'].values,
-            #                                        train_df['smoothed_diffX'].values,
-            #                                        'blue', 'observation'),
-            #                  y_axis_title='Smoothed Difference 1-3'),
-            # create_err_graph_div('Testing Data (error)', 'test-error-plot',
-            #                  generate_scatter_plot(test_df['timestamp'].values,
-            #                                        test_df['smoothed_diffX'].values,
-            #                                        'red', 'observation'),
-            #                  y_axis_title='Smoothed Difference 1-3')
-            ########
-        ], style={'width': '90%', 'display': 'inline-block'}),
+                                                   'red', 'Observation'),),
+        ], style={'width': '85%', 'display': 'inline-block'}),
     ]),
 ])
 
@@ -193,16 +178,15 @@ app.layout = html.Div([
      Input('train-date-start-dropdown', 'value'),
      Input('train-date-end-dropdown', 'value'),
      Input('interval-selection-dropdown', 'value')
-     ]
-)
+     ])
 def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type,
                            test_date_str, train_date_start_str, train_date_end_str, interval):
     processed_df = update_processed_data(interval)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_diffX',
-                                         'Training Data: Smoothed Difference',
-                                         'Test Data: Smoothed Difference',
+                                         'Training Data (Differential X motion)',
+                                         'Testing Data (Differential X motion)',
                                          options)
 
 
@@ -218,44 +202,25 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type,
      Input('train-date-start-dropdown', 'value'),
      Input('train-date-end-dropdown', 'value'),
      Input('interval-selection-dropdown', 'value')
-     ]
-)
+     ])
 def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
                            test_date_str, train_date_start_str, train_date_end_str, interval):
     processed_df = update_processed_data(interval)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_diffY',
-                                         'Training Data: Smoothed Difference',
-                                         'Test Data: Smoothed Difference',
+                                         'Training Data (Differential X motion)',
+                                         'Testing Data (Differential X motion)',
                                          options)
 
 
-# @app.callback(
-#     [Output('train-error-plot', 'figure'),
-#      Output('test-error-plot', 'figure')],
-#     [Input('toggle-data', 'value'),
-#      Input('start-hour-input', 'value'),
-#      Input('end-hour-input', 'value'),
-#      Input('model-type-toggle', 'value'),
-#      Input('test-date-dropdown', 'value'),
-#      Input('interval-selection-dropdown', 'value')
-#      ]
-# )
-# def update_error_graphs(toggle_value, start_hour, end_hour, model_type, test_date_str, interval):
-#     processed_df = update_processed_data(interval)
-#     return update_error_graphs_list(model_type, toggle_value, start_hour, end_hour,
-#     processed_df, test_date_str, options)
-
-
-@app.callback(
+@app.callback([
     Output('download-zip', 'data'),
     Input('download-zip-btn', 'n_clicks'),
     State('toggle-data', 'value'),
     State('start-hour-input', 'value'),
-    State('end-hour-input', 'value'),
-    prevent_initial_call=True
-)
+    State('end-hour-input', 'value')],
+    prevent_initial_call=True)
 def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
     if n_clicks > 0:
 
@@ -296,12 +261,12 @@ def update_processed_data(interval):
 
     return processed_df
 
+
 @app.callback(
     Output('toggle-data', 'value'),
     [Input('select-all', 'n_clicks'),
      Input('deselect-all', 'n_clicks')],
-    [State('toggle-data', 'options')]
-)
+    [State('toggle-data', 'options')])
 def update_checklist(select_all_clicks, deselect_all_clicks, options):
     ctx = dash.callback_context
 
