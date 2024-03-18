@@ -5,7 +5,7 @@ from io import BytesIO
 from zipfile import ZipFile
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
-                             get_column_list, smooth_data, filter_dataframe_by_hours)
+                             get_column_list, smooth_data, filter_dataframe_by_hours, filter_train_data_by_date)
 from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
 from get_ip import get_wired_interface_ip
 import numpy as np
@@ -34,9 +34,8 @@ unique_dates = np.sort(processed_df['date'].unique())[:-1]
 formatted_dates = [date.strftime('%Y/%m/%d') for date in unique_dates]
 # Create dropdown options
 dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
-
 # Split data into training and test datasets
-train_df, test_df = split_train_test(processed_df, formatted_dates[-1])
+train_df, test_df = split_train_test(processed_df, formatted_dates[-1], formatted_dates[-5], formatted_dates[-2])
 
 # Assume col_list is a list of column names from your DataFrame
 col_list = get_column_list(processed_df)
