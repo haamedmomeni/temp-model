@@ -31,9 +31,10 @@ def create_figure(data_list, title):
 
 # Function to generate equation string
 def generate_equation_str(coef, intercept, toggle_value):
-    coef = coef.flatten().tolist()
-    equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} {toggle_value[i][5:].lower()}" for i, c in enumerate(coef)]
-    return f"Equation: {intercept[0]:.2f}  {' '.join(equation_terms)}"
+    coef_list = coef.flatten().tolist()
+    intercept_val = intercept[0]
+    equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} {toggle_value[i][5:].lower()}" for i, c in enumerate(coef_list)]
+    return f"Equation: {intercept_val:.2f}  {' '.join(equation_terms)}"
 
 
 def create_graph_div(title, graph_id, data):
@@ -64,24 +65,19 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
     t_train = trained_df_filtered['timestamp'].values
     t_test = test_df_filtered['timestamp'].values
 
-    col_ref = 'smoothed_refY' if diff_col == 'smoothed_difference_2_4' else 'smoothed_refX'
-
-    y_train = trained_df_filtered[diff_col].values + trained_df_filtered[col_ref].values
-    y_test = test_df_filtered[diff_col].values + test_df_filtered[col_ref].values
+    y_train = trained_df_filtered[diff_col].values
+    y_test = test_df_filtered[diff_col].values
 
     y_train_std = np.std(y_train)
     y_test_std = np.std(y_test)
-
-    train_data_list = [generate_scatter_plot(t_train, y_train, 'blue', f'<b>Observation</b><br>std: {y_train_std:.3f}')]
-    test_data_list = [generate_scatter_plot(t_test, y_test, 'green', f'<b>Observation</b><br>std: {y_test_std:.3f}')]
 
     model, y_pred_train, rmse_train, max_err_train, coef, intercept = fit_and_predict_training_data(
         model_type, toggle_value, trained_df_filtered, diff_col, options)
     y_pred_test, rmse_test, max_err_test = predict_test_data(
         model, toggle_value, test_df_filtered, diff_col, options)
 
-    y_pred_train += trained_df_filtered[col_ref].values
-    y_pred_test += test_df_filtered[col_ref].values
+    train_data_list = [generate_scatter_plot(t_train, y_train, 'blue', f'<b>Observation</b><br>std: {y_train_std:.3f}')]
+    test_data_list = [generate_scatter_plot(t_test, y_test, 'green', f'<b>Observation</b><br>std: {y_test_std:.3f}')]
 
     train_data_list.append(generate_scatter_plot(t_train, y_pred_train, 'red',
                                                  f"<b>Prediction</b><br>rmse: {rmse_train:.3f}<br>max err: {max_err_train:.2f}"))
@@ -89,7 +85,7 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
                                                 f"<b>Prediction</b><br>rmse: {rmse_test:.3f}<br>max err: {max_err_test:.2f}"))
 
     equation_str = "No equation to display"
-    if model_type == 'LR' and len(toggle_value) > 1:
+    if model_type == 'LR' and len(toggle_value) > 0:
         equation_str = generate_equation_str(coef, intercept, toggle_value)
 
     return create_figure(train_data_list, train_fig_title), create_figure(test_data_list, test_fig_title), equation_str

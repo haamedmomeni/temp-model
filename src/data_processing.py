@@ -38,7 +38,7 @@ def preprocess_data(df, interval):
     if interval != 0:
         df = add_reference_column_at_periodic_interval_optimized(df, 'diffX', 'refX', interval)
         df = add_reference_column_at_periodic_interval_optimized(df, 'diffY', 'refY', interval)
-        df['diffX'], df['diffY'] = df['diffX'] - df['refX'], df['diffY'] - df['refY']
+        # df['diffX'], df['diffY'] = df['diffX'] - df['refX'], df['diffY'] - df['refY']
 
     return df
 
@@ -68,7 +68,7 @@ def split_train_test(df, test_date_str, train_date_start=None, train_date_end=No
     end_timestamp = start_timestamp + pd.Timedelta(days=1)
 
     # Split the data based on the start and end timestamps
-    condition = (start_timestamp <= df['timestamp']) & (df['timestamp'] <= end_timestamp)
+    condition = (start_timestamp < df['timestamp']) & (df['timestamp'] <= end_timestamp)
     train_df, test_df = df[~condition].copy(), df[condition].copy()
 
     if train_date_start and train_date_end:
@@ -136,10 +136,11 @@ def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_na
 
 def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options):
     coef, intercept = 0, 0
+    col_ref = col.replace('diff', 'ref')
     # if no option is selected, the reference value will be used as the prediction
     if len(toggle_value) == 0:
-        y = training_df[col].values.reshape(-1, 1)
-        y_pred = np.zeros(training_df.shape[0])
+        y = training_df[col]
+        y_pred = training_df[col_ref]
         rmse, max_err = calc_rmse_maxerr(y, y_pred)
         return 'ref', y_pred, rmse, max_err, 0, 0
 
@@ -154,6 +155,8 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
 
     # Extract X and y from test_df using col_names
     X, y = training_df[col_names[:-1]].values, training_df[col].values.reshape(-1, 1)
+    y_ref = training_df[col_ref].values.reshape(-1, 1)
+    y = np.array(y) - np.array(y_ref)
 
     # Select the model ["LR", "KNN", "XGB", "RNN"]
     if model_type == "LR":
@@ -222,20 +225,22 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
         model.fit(X, y)
 
     # Predict the values of y (target variable)
-    y_pred = model.predict(X).ravel()  # Flatten the array
-
+    y_pred = np.array(model.predict(X))
     rmse, max_err = calc_rmse_maxerr(y, y_pred)
+    y_pred += np.array(y_ref)
+    y_pred = list(y_pred.ravel())
 
-    if model_type == "LR" and len(toggle_value) > 1:
+    if model_type == "LR" and len(toggle_value) > 0:
         coef, intercept = model.coef_, model.intercept_
 
     return model, y_pred, rmse, max_err, coef, intercept
 
 
 def predict_test_data(model, toggle_value, test_df, col, options):
+    col_ref = col.replace('diff', 'ref')
     if model == 'ref':
-        y = test_df[col].values.reshape(-1, 1)
-        y_pred = np.zeros(test_df.shape[0])
+        y = test_df[col].values
+        y_pred = test_df[col_ref].values
         rmse, max_err = calc_rmse_maxerr(y, y_pred)
         return y_pred, rmse, max_err
 
@@ -248,11 +253,14 @@ def predict_test_data(model, toggle_value, test_df, col, options):
 
     # Extract X and y from test_df using col_names
     X, y = test_df[col_names[:-1]].values, test_df[col].values.reshape(-1, 1)
+    y_ref = test_df[col_ref].values.reshape(-1, 1)
+    y = np.array(y) - np.array(y_ref)
 
     # Predict the values of y (target variable)
-    y_pred = model.predict(X).ravel()  # Flatten the array
-
+    y_pred = np.array(model.predict(X))
     rmse, max_err = calc_rmse_maxerr(y, y_pred)
+    y_pred += np.array(y_ref)
+    y_pred = list(y_pred.ravel())
 
     return y_pred, rmse, max_err
 

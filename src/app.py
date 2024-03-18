@@ -63,7 +63,7 @@ interval_options = [
     {'label': '6 hours', 'value': 360},
     {'label': '8 hours', 'value': 480},
     {'label': '12 hours', 'value': 720},
-    {'label': 'None', 'value': 0}
+    # {'label': 'None', 'value': 0}
 ]
 
 button_style = {'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white",
@@ -124,7 +124,10 @@ app.layout = html.Div([
                 labelStyle={"display": "block", "margin": "5px", "color": "white",
                             "background-color": "#3B3B3B", "padding": "5px", "border-radius": "5px"}
             ),
+        ], style={'width': '10%', 'display': 'inline-block', 'verticalAlign': 'top'}),
 
+        # Second column
+        html.Div([
             # Interval, Starting Hour, Ending Hour, and Date Selections
             generate_dropdown('Select Realignment Interval (refX, refY):', 'interval-selection-dropdown',
                               interval_options, 720, dropdown_style, label_style, div_style),
@@ -138,10 +141,9 @@ app.layout = html.Div([
                               dropdown_options, formatted_dates[-2], dropdown_style, label_style, div_style),
             generate_dropdown('Select Test Date:', 'test-date-dropdown',
                               dropdown_options, formatted_dates[-1], dropdown_style, label_style, div_style),
+        ], style={'width': '14%', 'display': 'inline-block'}),
 
-        ], style={'width': '15%', 'display': 'inline-block', 'verticalAlign': 'top'}),
-
-        # Second column
+        # Third column
         html.Div([
             html.Div(id='equation-display-2', style={'color': '#FF5349'}),
             create_graph_div('Training Data (Differential Y motion)', 'train-diff-2-4',
@@ -161,7 +163,7 @@ app.layout = html.Div([
                              generate_scatter_plot(test_df['timestamp'].values,
                                                    test_df['smoothed_diffX'].values,
                                                    'red', 'Observation'),),
-        ], style={'width': '85%', 'display': 'inline-block'}),
+        ], style={'width': '75%', 'display': 'inline-block'}),
     ]),
 ])
 
