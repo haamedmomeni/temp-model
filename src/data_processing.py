@@ -225,7 +225,7 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
         model.fit(X, y)
 
     # Predict the values of y (target variable)
-    y_pred = np.array(model.predict(X))
+    y_pred = np.array(model.predict(X)).reshape(-1, 1)
     rmse, max_err = calc_rmse_maxerr(y, y_pred)
     y_pred += np.array(y_ref)
     y_pred = list(y_pred.ravel())
@@ -257,7 +257,7 @@ def predict_test_data(model, toggle_value, test_df, col, options):
     y = np.array(y) - np.array(y_ref)
 
     # Predict the values of y (target variable)
-    y_pred = np.array(model.predict(X))
+    y_pred = np.array(model.predict(X)).reshape(-1, 1)
     rmse, max_err = calc_rmse_maxerr(y, y_pred)
     y_pred += np.array(y_ref)
     y_pred = list(y_pred.ravel())

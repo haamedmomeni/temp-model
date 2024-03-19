@@ -1,8 +1,13 @@
+import io
+import zipfile
+
+import pandas as pd
 from dash import Dash, dcc, html, Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
 from io import BytesIO
 from zipfile import ZipFile
+import base64
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
                              get_column_list, smooth_data, filter_dataframe_by_hours, filter_train_data_by_date)
@@ -214,42 +219,94 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
                                          'Testing Data (Differential X motion)',
                                          options)
 
-
-@app.callback([
-    Output('download-zip', 'data'),
-    Input('download-zip-btn', 'n_clicks'),
+@app.callback(
+    Output("download-zip", "data"),
+    Input("download-zip-btn", "n_clicks"),
     State('toggle-data', 'value'),
     State('start-hour-input', 'value'),
-    State('end-hour-input', 'value')],
-    prevent_initial_call=True)
-def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour):
-    if n_clicks > 0:
+    State('end-hour-input', 'value'),
+    State('test-date-dropdown', 'value'),
+    State('train-date-start-dropdown', 'value'),
+    State('train-date-end-dropdown', 'value'),
+    State('interval-selection-dropdown', 'value'),
+    prevent_initial_call=True,
+)
+def func(n_clicks, toggle_value, start_hour, end_hour, test_date_str, train_date_start_str, train_date_end_str, interval):
+    processed_df = update_processed_data(interval)
+    train_df, test_df = split_train_test(processed_df, test_date_str, train_date_start_str, train_date_end_str)
+    trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
+    test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+    value_to_label = {option['value']: option['label'] for option in options}
+    selected_columns = (['timestamp'] +
+                        ['smoothed_'+value_to_label[value] for value in toggle_value] +
+                        ['smoothed_refX', 'smoothed_refY'] +
+                        ['smoothed_diffX', 'smoothed_diffY'])
 
-        trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
-        test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+    test_csv = test_df_filtered[selected_columns].to_csv(index=False)
+    train_csv = trained_df_filtered[selected_columns].to_csv(index=False)
 
-        # Create a mapping from value to label
-        value_to_label = {option['value']: option['label'] for option in options}
+    zip_buffer = io.BytesIO()
+    with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zf:
+        zf.writestr('test_data.csv', test_csv)
+        zf.writestr('train_data.csv', train_csv)
+    zip_buffer.seek(0)
+    return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
 
-        # Filter columns based on selected options
-        selected_columns = (['timestamp'] +
-                            ['smoothed_'+value_to_label[value] for value in toggle_value] +
-                            ['smoothed_diffX', 'smoothed_diffY'])
-
-        # Create in-memory ZIP file
-        zip_buffer = BytesIO()
-        with ZipFile(zip_buffer, 'w') as zip_file:
-            # Convert train_df and test_df to CSV strings without index
-            train_csv = trained_df_filtered[selected_columns].dropna().to_csv(index=False)
-            test_csv = test_df_filtered[selected_columns].dropna().to_csv(index=False)
-
-            # Write CSV strings to the ZIP file
-            zip_file.writestr('train_data.csv', train_csv)
-            zip_file.writestr('test_data.csv', test_csv)
-
-        # Prepare the ZIP file to be sent to the client
-        zip_buffer.seek(0)
-        return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
+# @app.callback([
+#     Output('download-zip', 'data'),
+#     Input('download-zip-btn', 'n_clicks'),
+#     State('toggle-data', 'value'),
+#     State('start-hour-input', 'value'),
+#     State('end-hour-input', 'value'),
+#     State('test-date-dropdown', 'value'),
+#     State('train-date-start-dropdown', 'value'),
+#     State('train-date-end-dropdown', 'value'),
+#     State('interval-selection-dropdown', 'value')],
+#     prevent_initial_call=True)
+# def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour,
+#                               test_date_str, train_date_start_str, train_date_end_str, interval):
+#     if True: # n_clicks > 0:
+#         processed_df = update_processed_data(interval)
+#         train_df, test_df = split_train_test(processed_df, test_date_str,
+#                                              train_date_start_str, train_date_end_str)
+#
+#         print('Generating ZIP file...')
+#
+#         trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
+#         test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+#
+#         print('Filtered dataframes created')
+#         # Create a mapping from value to label
+#         value_to_label = {option['value']: option['label'] for option in options}
+#
+#         # Filter columns based on selected options
+#         selected_columns = (['timestamp'] +
+#                             ['smoothed_'+value_to_label[value] for value in toggle_value] +
+#                             ['smoothed_refX', 'smoothed_refY'] +
+#                             ['smoothed_diffX', 'smoothed_diffY'])
+#         print('Selected columns:', selected_columns)
+#         print(trained_df_filtered[selected_columns].head())
+#         # Create in-memory ZIP file
+#         train_csv = trained_df_filtered[selected_columns].dropna()
+#         print(type(train_csv))
+#         zip_buffer = BytesIO()
+#         # with ZipFile(zip_buffer, 'w') as zip_file:
+#         #     # Convert train_df and test_df to CSV strings without index
+#         #     train_csv = trained_df_filtered[selected_columns].dropna() # .to_csv(index=False)
+#         #     test_csv = test_df_filtered[selected_columns].dropna().to_csv(index=False)
+#
+#             # Write CSV strings to the ZIP file
+#             # zip_file.writestr('train_data.csv', train_csv)
+#             # zip_file.writestr('test_data.csv', test_csv)
+#         print('ZIP file created')
+#         # Prepare the ZIP file to be sent to the client
+#         # zip_buffer.seek(0)
+#         # return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
+#         df = pd.DataFrame({"a": [1, 2, 3, 4], "b": [2, 1, 5, 6], "c": ["x", "x", "y", "y"]})
+#         dict(content="Hello world!", filename="hello.txt")
+#         return dcc.send_data_frame(df.to_csv, "mydf.csv")
+#         # return dcc.send_file(zip_buffer, filename="data.zip")
+#         # return dict(content=zip_buffer.getvalue(), filename="data.zip")
 
 
 def update_processed_data(interval):
