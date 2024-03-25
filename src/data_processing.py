@@ -34,15 +34,20 @@ def preprocess_data(df, interval):
     df['date'] = df['timestamp'].dt.date
 
     df['diffX'], df['diffY']= df.iloc[:, 3] - df.iloc[:, 1], df.iloc[:, 4] - df.iloc[:, 2]
-
     if interval != 0:
         df = add_reference_column_at_periodic_interval_optimized(df, 'diffX', 'refX', interval)
         df = add_reference_column_at_periodic_interval_optimized(df, 'diffY', 'refY', interval)
-        # df['diffX'], df['diffY'] = df['diffX'] - df['refX'], df['diffY'] - df['refY']
-
+        lst = ['Mount plate R',
+       'Struct side', 'Base plate L', 'Struct base', 'VC interior aerial',
+       'Mount plate L', 'Pier N', 'Base plate R', 'Mirror mount top', 'Pier W',
+       'VC interior wall', 'Struct top', 'Ambient', 'Mirror mount bottom',
+       'Pier S', 'Pier E', ]
+        for c in lst:
+            df = add_reference_column_at_periodic_interval_optimized(df, c, f'ref_{c}', interval)
+            df[c] = df[c] - df[f'ref_{c}']
     return df
 
-
+#
 def smooth_data(df, window=1):
     # Ensure we're working with a copy to avoid modifying the original dataframe
     new_df = pd.DataFrame()
@@ -54,6 +59,8 @@ def smooth_data(df, window=1):
         column_name = f'smoothed_{column}'
         if window > 1:
             new_df[column_name] = df[column].rolling(window=window, min_periods=1).mean()
+            # remove the rows are the first window-1 rows in each day
+            new_df[column_name] = new_df[column_name].mask(df['timestamp'].dt.hour < window - 1)
         else:
             new_df[column_name] = df[column]
     # add date and timestamp columns
@@ -160,7 +167,7 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
 
     # Select the model ["LR", "KNN", "XGB", "RNN"]
     if model_type == "LR":
-        model = LinearRegression()
+        model = LinearRegression(fit_intercept=False)
 
     elif model_type == "KNN":
         model = KNeighborsRegressor(n_neighbors=1)

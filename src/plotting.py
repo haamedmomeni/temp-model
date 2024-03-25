@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import plotly.graph_objs as go
 from dash import dcc, html
@@ -17,7 +19,7 @@ def generate_scatter_plot(x_array, y_array, color, name):
 
 
 # Function to create a figure dictionary
-def create_figure(data_list, title):
+def create_figure(data_list, title, y_axis_title='Motion (arcsec)'):
     return {
         'data': data_list,
         'layout': go.Layout(
@@ -32,7 +34,10 @@ def create_figure(data_list, title):
 # Function to generate equation string
 def generate_equation_str(coef, intercept, toggle_value):
     coef_list = coef.flatten().tolist()
-    intercept_val = intercept[0]
+    if intercept:
+        intercept_val = intercept[0]
+    else:
+        intercept_val = 0
     equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} {toggle_value[i][5:].lower()}" for i, c in enumerate(coef_list)]
     return f"Equation: {intercept_val:.2f}  {' '.join(equation_terms)}"
 
@@ -89,3 +94,40 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
         equation_str = generate_equation_str(coef, intercept, toggle_value)
 
     return create_figure(train_data_list, train_fig_title), create_figure(test_data_list, test_fig_title), equation_str
+
+
+def update_graphs_raw(toggle_value, start_hour, end_hour, df, test_date_str,
+                                  train_date_start_str, train_date_end_str,
+                                  train_fig_title, test_fig_title, options):
+    test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
+    train_df, test_df = split_train_test(df, test_date, train_date_start_str, train_date_end_str)
+
+    trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
+    test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+
+    t_train = trained_df_filtered['timestamp'].values
+    t_test = test_df_filtered['timestamp'].values
+    # Create a mapping dictionary from value to label
+    value_to_label = {option['value']: option['label'] for option in options}
+    # Build column names list for X based on toggle_value, avoiding specific ref columns
+    col_names = [f'smoothed_{value_to_label[val]}' for val in toggle_value]
+    train_data_list = []
+    test_data_list = []
+    y_label = 'Temperature (°C)'
+    for col in col_names:
+        # make a random color
+        random_color = '#' + ''.join([random.choice('0123456789ABCDEF') for i in range(6)])
+        col_name = col.replace('smoothed_', '')
+        col_ref = 'smoothed_' + col.replace('smoothed', 'ref')
+        y_train = trained_df_filtered[col].values
+        y_ref_train = trained_df_filtered[col_ref].values
+        y_train = y_train + y_ref_train
+        train_data_list.append(generate_scatter_plot(t_train, y_train, random_color, f'<b>{col_name}</b>'))
+
+        y_test = test_df_filtered[col].values
+        y_ref_test = test_df_filtered[col_ref].values
+        y_test = y_test + y_ref_test
+        test_data_list.append(generate_scatter_plot(t_test, y_test, random_color, f'<b>{col_name}</b>'))
+
+    return create_figure(train_data_list, train_fig_title, y_label),\
+            create_figure(test_data_list, test_fig_title, y_label)

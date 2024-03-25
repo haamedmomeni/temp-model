@@ -11,7 +11,7 @@ import base64
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
                              get_column_list, smooth_data, filter_dataframe_by_hours, filter_train_data_by_date)
-from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions
+from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions, update_graphs_raw
 from get_ip import get_wired_interface_ip
 import numpy as np
 
@@ -167,6 +167,14 @@ app.layout = html.Div([
                              generate_scatter_plot(test_df['timestamp'].values,
                                                    test_df['smoothed_diffX'].values,
                                                    'red', 'Observation'),),
+            create_graph_div('Training Data (Differential X motion)', 'train-raw',
+                             generate_scatter_plot(train_df['timestamp'].values,
+                                                   train_df['smoothed_diffX'].values,
+                                                   'blue', 'Observation'),),
+            create_graph_div('Testing Data (Differential X motion)', 'test-raw',
+                             generate_scatter_plot(test_df['timestamp'].values,
+                                                   test_df['smoothed_diffX'].values,
+                                                   'red', 'Observation'),),
         ], style={'width': '75%', 'display': 'inline-block'}),
     ]),
 ])
@@ -215,8 +223,30 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_diffY',
-                                         'Training Data (Differential X motion)',
-                                         'Testing Data (Differential X motion)',
+                                         'Training Data (Differential Y motion)',
+                                         'Testing Data (Differential Y motion)',
+                                         options)
+
+
+@app.callback(
+    [Output('train-raw', 'figure'),
+     Output('test-raw', 'figure')],
+    [Input('toggle-data', 'value'),
+     Input('start-hour-input', 'value'),
+     Input('end-hour-input', 'value'),
+     Input('test-date-dropdown', 'value'),
+     Input('train-date-start-dropdown', 'value'),
+     Input('train-date-end-dropdown', 'value'),
+     Input('interval-selection-dropdown', 'value')
+     ])
+def update_raw_graphs(toggle_value, start_hour, end_hour,
+                           test_date_str, train_date_start_str, train_date_end_str, interval):
+    processed_df = update_processed_data(interval)
+
+    return update_graphs_raw(toggle_value, start_hour, end_hour, processed_df,
+                                         test_date_str, train_date_start_str, train_date_end_str,
+                                         'Training Data (Temperatures)',
+                                         'Testing Data (Temperatures)',
                                          options)
 
 @app.callback(
@@ -251,62 +281,6 @@ def func(n_clicks, toggle_value, start_hour, end_hour, test_date_str, train_date
         zf.writestr('train_data.csv', train_csv)
     zip_buffer.seek(0)
     return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
-
-# @app.callback([
-#     Output('download-zip', 'data'),
-#     Input('download-zip-btn', 'n_clicks'),
-#     State('toggle-data', 'value'),
-#     State('start-hour-input', 'value'),
-#     State('end-hour-input', 'value'),
-#     State('test-date-dropdown', 'value'),
-#     State('train-date-start-dropdown', 'value'),
-#     State('train-date-end-dropdown', 'value'),
-#     State('interval-selection-dropdown', 'value')],
-#     prevent_initial_call=True)
-# def generate_and_download_zip(n_clicks, toggle_value, start_hour, end_hour,
-#                               test_date_str, train_date_start_str, train_date_end_str, interval):
-#     if True: # n_clicks > 0:
-#         processed_df = update_processed_data(interval)
-#         train_df, test_df = split_train_test(processed_df, test_date_str,
-#                                              train_date_start_str, train_date_end_str)
-#
-#         print('Generating ZIP file...')
-#
-#         trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
-#         test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
-#
-#         print('Filtered dataframes created')
-#         # Create a mapping from value to label
-#         value_to_label = {option['value']: option['label'] for option in options}
-#
-#         # Filter columns based on selected options
-#         selected_columns = (['timestamp'] +
-#                             ['smoothed_'+value_to_label[value] for value in toggle_value] +
-#                             ['smoothed_refX', 'smoothed_refY'] +
-#                             ['smoothed_diffX', 'smoothed_diffY'])
-#         print('Selected columns:', selected_columns)
-#         print(trained_df_filtered[selected_columns].head())
-#         # Create in-memory ZIP file
-#         train_csv = trained_df_filtered[selected_columns].dropna()
-#         print(type(train_csv))
-#         zip_buffer = BytesIO()
-#         # with ZipFile(zip_buffer, 'w') as zip_file:
-#         #     # Convert train_df and test_df to CSV strings without index
-#         #     train_csv = trained_df_filtered[selected_columns].dropna() # .to_csv(index=False)
-#         #     test_csv = test_df_filtered[selected_columns].dropna().to_csv(index=False)
-#
-#             # Write CSV strings to the ZIP file
-#             # zip_file.writestr('train_data.csv', train_csv)
-#             # zip_file.writestr('test_data.csv', test_csv)
-#         print('ZIP file created')
-#         # Prepare the ZIP file to be sent to the client
-#         # zip_buffer.seek(0)
-#         # return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
-#         df = pd.DataFrame({"a": [1, 2, 3, 4], "b": [2, 1, 5, 6], "c": ["x", "x", "y", "y"]})
-#         dict(content="Hello world!", filename="hello.txt")
-#         return dcc.send_data_frame(df.to_csv, "mydf.csv")
-#         # return dcc.send_file(zip_buffer, filename="data.zip")
-#         # return dict(content=zip_buffer.getvalue(), filename="data.zip")
 
 
 def update_processed_data(interval):
