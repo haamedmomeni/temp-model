@@ -4,7 +4,7 @@ import numpy as np
 import plotly.graph_objs as go
 from dash import dcc, html
 from data_processing import filter_dataframe_by_hours, fit_and_predict_training_data, split_train_test, \
-    predict_test_data
+    predict_test_data, smooth_data
 from datetime import datetime
 
 
@@ -34,12 +34,15 @@ def create_figure(data_list, title, y_axis_title='Motion (arcsec)'):
 # Function to generate equation string
 def generate_equation_str(coef, intercept, toggle_value):
     coef_list = coef.flatten().tolist()
-    if intercept:
-        intercept_val = intercept[0]
-    else:
-        intercept_val = 0
-    equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} {toggle_value[i][5:].lower()}" for i, c in enumerate(coef_list)]
-    return f"Equation: {intercept_val:.2f}  {' '.join(equation_terms)}"
+    equation_terms = [f"{'+' if c > 0 else ''}{c:.2f} &theta;<sub>{toggle_value[i][5:].lower()}</sub>" for i, c in enumerate(coef_list)]
+    return dcc.Markdown(f"y - y<sub>ref</sub> = &Sigma;(&theta;<sub>i</sub> - &theta;<sub>i, ref</sub>) = "
+                        f" {' '.join(equation_terms)}",
+                        dangerously_allow_html=True)
+    # if intercept:
+    #     intercept_val = intercept[0]
+    #     f"Equation: {intercept_val:.2f}  {' '.join(equation_terms)}"
+    # else:
+    #     return f"Equation: y-y_ref = \sigma t-t_ref {' '.join(equation_terms)}"
 
 
 def create_graph_div(title, graph_id, data):
@@ -66,6 +69,10 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+
+    trained_df_filtered = smooth_data(trained_df_filtered)
+    test_df_filtered = smooth_data(test_df_filtered)
+
 
     t_train = trained_df_filtered['timestamp'].values
     t_test = test_df_filtered['timestamp'].values

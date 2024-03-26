@@ -30,7 +30,7 @@ raw_df = load_csv(FILENAME)
 
 # Preprocess data
 processed_df = preprocess_data(raw_df, 0)
-processed_df = smooth_data(processed_df)
+processed_df = smooth_data(processed_df, 1)
 
 
 # List all unique dates in the dataframe
@@ -289,7 +289,7 @@ def update_processed_data(interval):
 
     # Update the call to your preprocess function with the selected interval
     processed_df = preprocess_data(raw_df, interval)  # Adjust function signature as needed
-    processed_df = smooth_data(processed_df)
+    processed_df = smooth_data(processed_df, 1)
 
     return processed_df
 

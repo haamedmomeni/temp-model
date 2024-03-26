@@ -48,7 +48,7 @@ def preprocess_data(df, interval):
     return df
 
 #
-def smooth_data(df, window=1):
+def smooth_data(df, window=5):
     # Ensure we're working with a copy to avoid modifying the original dataframe
     new_df = pd.DataFrame()
 
@@ -56,16 +56,21 @@ def smooth_data(df, window=1):
     numeric_cols = df.select_dtypes(include=[np.number]).columns
     for column in numeric_cols:
         # Apply smoothing or copy directly based on the window size
-        column_name = f'smoothed_{column}'
+        # if column_name is strat with 'smoothed_', it will be skipped
+        if column.startswith('smoothed_'):
+            column_name = column
+        else:
+            column_name = f'smoothed_{column}'
         if window > 1:
             new_df[column_name] = df[column].rolling(window=window, min_periods=1).mean()
             # remove the rows are the first window-1 rows in each day
             new_df[column_name] = new_df[column_name].mask(df['timestamp'].dt.hour < window - 1)
         else:
             new_df[column_name] = df[column]
+
     # add date and timestamp columns
     new_df[['date', 'timestamp']] = df[['date', 'timestamp']]
-
+    new_df.dropna(inplace=True)
     return new_df
 
 
