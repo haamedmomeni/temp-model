@@ -48,7 +48,7 @@ def preprocess_data(df, interval):
     return df
 
 #
-def smooth_data(df, window=5):
+def smooth_data(df, window=1):
     # Ensure we're working with a copy to avoid modifying the original dataframe
     new_df = pd.DataFrame()
 

@@ -30,7 +30,7 @@ raw_df = load_csv(FILENAME)
 
 # Preprocess data
 processed_df = preprocess_data(raw_df, 0)
-processed_df = smooth_data(processed_df, 1)
+processed_df = smooth_data(processed_df, 5)
 
 
 # List all unique dates in the dataframe
