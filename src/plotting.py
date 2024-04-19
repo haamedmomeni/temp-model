@@ -25,7 +25,7 @@ def create_figure(data_list, title, y_axis_title='Motion (arcsec)'):
         'layout': go.Layout(
             title=title,
             xaxis={'title': 'Timestamp'},
-            yaxis={'title': 'Motion (arcsec)'},
+            yaxis={'title': y_axis_title},
             uirevision='constant'
         )
     }
@@ -66,6 +66,7 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
                                   train_fig_title, test_fig_title, options):
     test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
     train_df, test_df = split_train_test(df, test_date, train_date_start_str, train_date_end_str)
+    print(f"train_df: {train_df.shape[0]}, test_df: {test_df.shape[0]}")
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)

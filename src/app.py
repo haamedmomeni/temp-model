@@ -25,7 +25,8 @@ def generate_dropdown(label, id, options, value, style, label_style, div_style):
 
 
 # Load data
-FILENAME = '2024-01-10_v2.csv'
+# FILENAME = '2024-01-10_v2.csv'
+FILENAME = '../data/2024-03-30_correct.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
@@ -40,7 +41,8 @@ formatted_dates = [date.strftime('%Y/%m/%d') for date in unique_dates]
 # Create dropdown options
 dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
 # Split data into training and test datasets
-train_df, test_df = split_train_test(processed_df, formatted_dates[-1], formatted_dates[-5], formatted_dates[-2])
+# TODO -3 was -5
+train_df, test_df = split_train_test(processed_df, formatted_dates[-1], formatted_dates[-2], formatted_dates[-2])
 
 # Assume col_list is a list of column names from your DataFrame
 col_list = get_column_list(processed_df)
@@ -142,7 +144,7 @@ app.layout = html.Div([
             generate_dropdown('Select Starting Date for Train:', 'train-date-start-dropdown',
                               dropdown_options, formatted_dates[-5], dropdown_style, label_style, div_style),
             generate_dropdown('Select Ending Date for Train:', 'train-date-end-dropdown',
-                              dropdown_options, formatted_dates[-2], dropdown_style, label_style, div_style),
+                              dropdown_options, formatted_dates[-1], dropdown_style, label_style, div_style),
             generate_dropdown('Select Test Date:', 'test-date-dropdown',
                               dropdown_options, formatted_dates[-1], dropdown_style, label_style, div_style),
         ], style={'width': '14%', 'display': 'inline-block'}),
@@ -317,7 +319,7 @@ def update_checklist(select_all_clicks, deselect_all_clicks, options):
 
 # === Run the App ===
 if __name__ == '__main__':
-    # ip_address = get_wired_interface_ip()
-    # app.run_server(debug=True, host=f"{ip_address}",
-    #                port=8050)
-    app.run_server(debug=True)
+    ip_address = get_wired_interface_ip()
+    app.run_server(debug=True, host=f"{ip_address}",
+                   port=8050)
+    # app.run_server(debug=True)

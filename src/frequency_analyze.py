@@ -7,7 +7,7 @@ from matplotlib import pyplot as plt
 import seaborn as sns
 
 # Constants
-FILE_PATH_TRAIN = 'train_data.csv'
+FILE_PATH_TRAIN = '../data/train_data.csv'
 NUM_COLORS = 8  # Adjust based on the number of conditions you have
 COLOR_PALETTE = sns.color_palette("flare", NUM_COLORS)
 TARGET_COLUMN_X = 'smoothed_difference_1_3'

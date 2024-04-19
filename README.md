@@ -5,7 +5,7 @@
 This repository hosts the code for a dynamic HTML dashboard designed to visualize and evaluate the performance of predictive models. The dashboard is interactive and publicly accessible at [temp-model-dash.onrender.com](https://temp-model-dash.onrender.com/).
 
 ### Screenshot
-![Predictive Model Dashboard Screenshot](/src/screenshot.png "Dashboard Overview")
+![Predictive Model Dashboard Screenshot](/screenshot.png "Dashboard Overview")
 
 ## Key Features
 

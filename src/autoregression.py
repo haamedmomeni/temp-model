@@ -16,7 +16,7 @@ warnings.filterwarnings("ignore", message="Maximum Likelihood optimization faile
 
 
 # Constants
-FILE_PATH_TRAIN = 'train_data.csv'
+FILE_PATH_TRAIN = '../data/train_data.csv'
 TARGET_COLUMN_Y = 'smoothed_difference_2_4'
 INTERVAL = 1/6  # 10 minutes
 # p, d, q = 0, 0, 0  # Example ARIMA model parameters

@@ -5,7 +5,7 @@ import pandas as pd
 from statsmodels.tsa.arima.model import ARIMA
 
 # Constants
-FILE_PATH_TRAIN = 'train_data.csv'
+FILE_PATH_TRAIN = '../data/train_data.csv'
 TARGET_COLUMN_Y = 'smoothed_difference_2_4'
 INTERVAL = 1 / 6  # 10 minutes
 

@@ -12,11 +12,12 @@ from sklearn.metrics import mean_squared_error, max_error
 
 
 def load_csv(file_path):
-    df = pd.read_csv(file_path)
+    df = pd.read_csv(file_path, index_col=False)
     df.drop([0, 1], inplace=True)
     df = df.ffill()
     df.dropna(inplace=True)
-    df = df.drop_duplicates(subset=['timestamp'], keep='first')
+    # TODO
+    # df = df.drop_duplicates(subset=['timestamp'], keep='first')
     # df = df.iloc[::5, :]
     return df
 
@@ -82,7 +83,6 @@ def split_train_test(df, test_date_str, train_date_start=None, train_date_end=No
     # Split the data based on the start and end timestamps
     condition = (start_timestamp < df['timestamp']) & (df['timestamp'] <= end_timestamp)
     train_df, test_df = df[~condition].copy(), df[condition].copy()
-
     if train_date_start and train_date_end:
         train_df = filter_train_data_by_date(train_df, train_date_start, train_date_end)
 
@@ -267,7 +267,6 @@ def predict_test_data(model, toggle_value, test_df, col, options):
     X, y = test_df[col_names[:-1]].values, test_df[col].values.reshape(-1, 1)
     y_ref = test_df[col_ref].values.reshape(-1, 1)
     y = np.array(y) - np.array(y_ref)
-
     # Predict the values of y (target variable)
     y_pred = np.array(model.predict(X)).reshape(-1, 1)
     rmse, max_err = calc_rmse_maxerr(y, y_pred)

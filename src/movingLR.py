@@ -20,7 +20,7 @@ def create_lagged_features(X, max_lags):
 n_lags = 360
 
 # Loading training data
-file_path_train = 'train_data.csv'
+file_path_train = '../data/train_data.csv'
 df_train = pd.read_csv(file_path_train)
 y_train = df_train.iloc[n_lags:, -1].values.reshape(-1, 1)  # Adjust y to match the reduced number of X rows
 X_train = df_train.iloc[:, 1:-2].to_numpy()  # Assuming the last column is y and the first is an index or identifier
@@ -31,7 +31,7 @@ X_train = create_lagged_features(X_train, n_lags)
 # print(X_train.shape)
 
 # Loading testing data
-file_path_test = 'test_data.csv'
+file_path_test = '../data/test_data.csv'
 df_test = pd.read_csv(file_path_test)
 y_test = df_test.iloc[n_lags:, -1].values.reshape(-1, 1)  # Similarly adjust y_test
 X_test = df_test.iloc[:, 1:-2].to_numpy()
