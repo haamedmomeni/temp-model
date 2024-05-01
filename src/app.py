@@ -26,7 +26,7 @@ def generate_dropdown(label, id, options, value, style, label_style, div_style):
 
 # Load data
 # FILENAME = '2024-01-10_v2.csv'
-FILENAME = '../data/2024-03-30_correct.csv'
+FILENAME = '../data/2024-03-30_04-18.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
@@ -40,8 +40,9 @@ unique_dates = np.sort(processed_df['date'].unique())[:-1]
 formatted_dates = [date.strftime('%Y/%m/%d') for date in unique_dates]
 # Create dropdown options
 dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
+
+
 # Split data into training and test datasets
-# TODO -3 was -5
 train_df, test_df = split_train_test(processed_df, formatted_dates[-1], formatted_dates[-2], formatted_dates[-2])
 
 # Assume col_list is a list of column names from your DataFrame
@@ -142,7 +143,7 @@ app.layout = html.Div([
             generate_dropdown('Select Ending Hour:', 'end-hour-input',
                               hour_options, 6, dropdown_style, label_style, div_style),
             generate_dropdown('Select Starting Date for Train:', 'train-date-start-dropdown',
-                              dropdown_options, formatted_dates[-5], dropdown_style, label_style, div_style),
+                              dropdown_options, formatted_dates[-6], dropdown_style, label_style, div_style),
             generate_dropdown('Select Ending Date for Train:', 'train-date-end-dropdown',
                               dropdown_options, formatted_dates[-1], dropdown_style, label_style, div_style),
             generate_dropdown('Select Test Date:', 'test-date-dropdown',

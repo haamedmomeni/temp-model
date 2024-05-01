@@ -33,7 +33,38 @@ def preprocess_data(df, interval):
 
     df['timestamp'] = pd.to_datetime(df['timestamp'])  # Convert the 'timestamp' column to datetime
     df['date'] = df['timestamp'].dt.date
+    ########################################################################################
+    processed_df = df.copy()
+    unique_dates = np.sort(processed_df['date'].unique())[:-1]
 
+    # Container for new rows to add
+    new_rows = []
+
+    # Loop through each unique date
+    for date in unique_dates:
+        # Check if 8 PM exists
+        date_8pm = pd.Timestamp(date) + pd.Timedelta(hours=20)
+        previous_minute = date_8pm
+        # Find the previous available row before 8 PM
+        while not ((processed_df['timestamp'] == previous_minute).any()):
+            previous_minute -= pd.Timedelta(minutes=1)
+
+        previous_row = processed_df[processed_df['timestamp'] == previous_minute].iloc[-1].copy()
+        # previous_row = processed_df[processed_df['timestamp'] == previous_minute].copy()
+        previous_row['timestamp'] = date_8pm
+        new_rows.append(previous_row.to_dict())
+
+    # Convert list of Series to DataFrame
+    new_rows_df = pd.DataFrame(new_rows)
+
+    # Append new rows to the original DataFrame
+    processed_df = processed_df.append(new_rows_df, ignore_index=True)
+
+    # Sort by timestamp
+    processed_df.sort_values(by='timestamp', inplace=True)
+
+    df = processed_df
+    ########################################################################################
     df['diffX'], df['diffY']= df.iloc[:, 3] - df.iloc[:, 1], df.iloc[:, 4] - df.iloc[:, 2]
     if interval != 0:
         df = add_reference_column_at_periodic_interval_optimized(df, 'diffX', 'refX', interval)
@@ -46,6 +77,8 @@ def preprocess_data(df, interval):
         for c in lst:
             df = add_reference_column_at_periodic_interval_optimized(df, c, f'ref_{c}', interval)
             df[c] = df[c] - df[f'ref_{c}']
+
+
     return df
 
 #
