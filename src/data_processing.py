@@ -58,12 +58,10 @@ def preprocess_data(df, interval):
     new_rows_df = pd.DataFrame(new_rows)
 
     # Append new rows to the original DataFrame
-    processed_df = processed_df.append(new_rows_df, ignore_index=True)
+    df = pd.concat([processed_df, new_rows_df], ignore_index=True)
 
     # Sort by timestamp
-    processed_df.sort_values(by='timestamp', inplace=True)
-
-    df = processed_df
+    df.sort_values(by='timestamp', inplace=True)
     ########################################################################################
     df['diffX'], df['diffY']= df.iloc[:, 3] - df.iloc[:, 1], df.iloc[:, 4] - df.iloc[:, 2]
     if interval != 0:
