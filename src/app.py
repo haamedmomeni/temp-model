@@ -1,16 +1,13 @@
 import io
 import zipfile
 
-import pandas as pd
 from dash import Dash, dcc, html, Input, Output, State
 import dash
 import dash_bootstrap_components as dbc
-from io import BytesIO
-from zipfile import ZipFile
-import base64
 
 from data_processing import (load_csv, preprocess_data, split_train_test,
-                             get_column_list, smooth_data, filter_dataframe_by_hours, filter_train_data_by_date)
+                             get_column_list, smooth_data, filter_dataframe_by_hours, filter_train_data_by_date,
+                             )
 from plotting import generate_scatter_plot, create_graph_div, update_graphs_and_predictions, update_graphs_raw
 from get_ip import get_wired_interface_ip
 import numpy as np
@@ -25,12 +22,11 @@ def generate_dropdown(label, id, options, value, style, label_style, div_style):
 
 
 # Load data
-# FILENAME = '2024-01-10_v2.csv'
 FILENAME = '../data/2024-03-30_04-18.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
-processed_df = preprocess_data(raw_df, 0)
+processed_df = preprocess_data(raw_df, 0, 20)
 processed_df = smooth_data(processed_df, 5)
 
 
@@ -40,7 +36,6 @@ unique_dates = np.sort(processed_df['date'].unique())[:-1]
 formatted_dates = [date.strftime('%Y/%m/%d') for date in unique_dates]
 # Create dropdown options
 dropdown_options = [{'label': date, 'value': date} for date in formatted_dates]
-
 
 # Split data into training and test datasets
 train_df, test_df = split_train_test(processed_df, formatted_dates[-1], formatted_dates[-2], formatted_dates[-2])
@@ -53,6 +48,7 @@ options = sorted(options, key=lambda x: x['label'])
 
 model_type_options = [
     {'label': 'Linear Regression', 'value': 'LR'},
+    {'label': 'Lasso Regression', 'value': 'Lasso'},
     {'label': 'K-Nearest Neighbors', 'value': 'KNN'},
     {'label': 'XGBoost', 'value': 'XGB'},
     {'label': 'Random Forest', 'value': 'RF'},
@@ -70,7 +66,6 @@ interval_options = [
     {'label': '6 hours', 'value': 360},
     {'label': '8 hours', 'value': 480},
     {'label': '12 hours', 'value': 720},
-    # {'label': 'None', 'value': 0}
 ]
 
 button_style = {'display': 'block', 'margin': '10px', 'fontWeight': 'bold', "color": "white",
@@ -98,7 +93,7 @@ app.layout = html.Div([
     html.Div(style={'display': 'flex', 'flexWrap': 'wrap', 'justifyContent': 'space-between'}, children=[
         # First column
         html.Div([
-
+            # Model type toggle
             html.Div([
 
                 html.Label('Choose Model Type:', style=label_style),
@@ -110,10 +105,20 @@ app.layout = html.Div([
                     labelStyle={'display': 'block', "color": "white", "background-color": "#3B3B3B", "padding": "5px",
                                 "border-radius": "5px", "margin": "5px"},
                     style={'fontWeight': 'bold'}
-                )
+                ),
+                # a slidebar for the threshold to move
+                html.Label('Alpha:', style=label_style),
+                dcc.Slider(
+                    id='threshold-slider',
+                    min=-3,
+                    max=1,
+                    step=0.1,
+                    value=-3,
+                    marks={i: str(10**i) for i in range(-3, 2)}
+                ),
             ],
                 style={'padding': '10px', 'background-color': '#2D2D2D', 'border-radius': '5px'}),
-
+            # Temperature selection
             html.Label('Temperatures:', style=label_style),
             html.Br(),
             html.Div(
@@ -194,17 +199,18 @@ app.layout = html.Div([
      Input('test-date-dropdown', 'value'),
      Input('train-date-start-dropdown', 'value'),
      Input('train-date-end-dropdown', 'value'),
-     Input('interval-selection-dropdown', 'value')
+     Input('interval-selection-dropdown', 'value'),
+     Input('threshold-slider', 'value')
      ])
 def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type,
-                           test_date_str, train_date_start_str, train_date_end_str, interval):
-    processed_df = update_processed_data(interval)
+                           test_date_str, train_date_start_str, train_date_end_str, interval, alpha):
+    processed_df = update_processed_data(interval, start_hour)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_diffX',
                                          'Training Data (Differential X motion)',
                                          'Testing Data (Differential X motion)',
-                                         options)
+                                         options, alpha)
 
 
 @app.callback(
@@ -218,17 +224,18 @@ def update_diff_1_3_graphs(toggle_value, start_hour, end_hour, model_type,
      Input('test-date-dropdown', 'value'),
      Input('train-date-start-dropdown', 'value'),
      Input('train-date-end-dropdown', 'value'),
-     Input('interval-selection-dropdown', 'value')
+     Input('interval-selection-dropdown', 'value'),
+     Input('threshold-slider', 'value')
      ])
 def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
-                           test_date_str, train_date_start_str, train_date_end_str, interval):
-    processed_df = update_processed_data(interval)
+                           test_date_str, train_date_start_str, train_date_end_str, interval, alpha):
+    processed_df = update_processed_data(interval, start_hour)
     return update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
                                          'smoothed_diffY',
                                          'Training Data (Differential Y motion)',
                                          'Testing Data (Differential Y motion)',
-                                         options)
+                                         options, alpha)
 
 
 @app.callback(
@@ -244,7 +251,7 @@ def update_diff_2_4_graphs(toggle_value, start_hour, end_hour, model_type,
      ])
 def update_raw_graphs(toggle_value, start_hour, end_hour,
                            test_date_str, train_date_start_str, train_date_end_str, interval):
-    processed_df = update_processed_data(interval)
+    processed_df = update_processed_data(interval, start_hour)
 
     return update_graphs_raw(toggle_value, start_hour, end_hour, processed_df,
                                          test_date_str, train_date_start_str, train_date_end_str,
@@ -265,10 +272,11 @@ def update_raw_graphs(toggle_value, start_hour, end_hour,
     prevent_initial_call=True,
 )
 def func(n_clicks, toggle_value, start_hour, end_hour, test_date_str, train_date_start_str, train_date_end_str, interval):
-    processed_df = update_processed_data(interval)
+    processed_df = update_processed_data(interval, start_hour)
     train_df, test_df = split_train_test(processed_df, test_date_str, train_date_start_str, train_date_end_str)
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
+
     value_to_label = {option['value']: option['label'] for option in options}
     selected_columns = (['timestamp'] +
                         ['smoothed_'+value_to_label[value] for value in toggle_value] +
@@ -286,12 +294,12 @@ def func(n_clicks, toggle_value, start_hour, end_hour, test_date_str, train_date
     return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
 
 
-def update_processed_data(interval):
+def update_processed_data(interval, reference_hour=20):
     # Re-load raw data if needed, or use it if already available in memory
     raw_df = load_csv(FILENAME)  # Consider optimizing this to avoid reloading
 
     # Update the call to your preprocess function with the selected interval
-    processed_df = preprocess_data(raw_df, interval)  # Adjust function signature as needed
+    processed_df = preprocess_data(raw_df, interval, reference_hour)  # Adjust function signature as needed
     processed_df = smooth_data(processed_df, 1)
 
     return processed_df

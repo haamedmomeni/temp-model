@@ -6,9 +6,7 @@ from sklearn.ensemble import RandomForestRegressor
 import xgboost as xg
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, max_error
-# import tensorflow as tf
-# from tensorflow.keras.models import Sequential
-# from tensorflow.keras.layers import SimpleRNN, Dense
+from sklearn.linear_model import Lasso
 
 
 def load_csv(file_path):
@@ -16,13 +14,11 @@ def load_csv(file_path):
     df.drop([0, 1], inplace=True)
     df = df.ffill()
     df.dropna(inplace=True)
-    # TODO
-    # df = df.drop_duplicates(subset=['timestamp'], keep='first')
     # df = df.iloc[::5, :]
     return df
 
 
-def preprocess_data(df, interval):
+def preprocess_data(df, interval, reference_hour=20):
     for col in df.columns:
         if df[col].dtype == 'object':
             try:
@@ -34,52 +30,51 @@ def preprocess_data(df, interval):
     df['timestamp'] = pd.to_datetime(df['timestamp'])  # Convert the 'timestamp' column to datetime
     df['date'] = df['timestamp'].dt.date
     ########################################################################################
-    processed_df = df.copy()
-    unique_dates = np.sort(processed_df['date'].unique())[:-1]
-
-    # Container for new rows to add
-    new_rows = []
-
-    # Loop through each unique date
-    for date in unique_dates:
-        # Check if 8 PM exists
-        date_8pm = pd.Timestamp(date) + pd.Timedelta(hours=20)
-        previous_minute = date_8pm
-        # Find the previous available row before 8 PM
-        while not ((processed_df['timestamp'] == previous_minute).any()):
-            previous_minute -= pd.Timedelta(minutes=1)
-
-        previous_row = processed_df[processed_df['timestamp'] == previous_minute].iloc[-1].copy()
-        # previous_row = processed_df[processed_df['timestamp'] == previous_minute].copy()
-        previous_row['timestamp'] = date_8pm
-        new_rows.append(previous_row.to_dict())
-
-    # Convert list of Series to DataFrame
-    new_rows_df = pd.DataFrame(new_rows)
-
-    # Append new rows to the original DataFrame
-    df = pd.concat([processed_df, new_rows_df], ignore_index=True)
-
-    # Sort by timestamp
-    df.sort_values(by='timestamp', inplace=True)
+    df = add_missing_values(df)
+    df = add_missing_values(df)
+    df = add_missing_values(df)
     ########################################################################################
-    df['diffX'], df['diffY']= df.iloc[:, 3] - df.iloc[:, 1], df.iloc[:, 4] - df.iloc[:, 2]
+    df['diffX'], df['diffY'] = df.iloc[:, 3] - df.iloc[:, 1], df.iloc[:, 4] - df.iloc[:, 2]
     if interval != 0:
-        df = add_reference_column_at_periodic_interval_optimized(df, 'diffX', 'refX', interval)
-        df = add_reference_column_at_periodic_interval_optimized(df, 'diffY', 'refY', interval)
+        df = add_reference_column_at_periodic_interval_optimized(df, 'diffX', 'refX',
+                                                                 interval, reference_hour)
+        df = add_reference_column_at_periodic_interval_optimized(df, 'diffY', 'refY',
+                                                                 interval, reference_hour)
         lst = ['Mount plate R',
-       'Struct side', 'Base plate L', 'Struct base', 'VC interior aerial',
-       'Mount plate L', 'Pier N', 'Base plate R', 'Mirror mount top', 'Pier W',
-       'VC interior wall', 'Struct top', 'Ambient', 'Mirror mount bottom',
-       'Pier S', 'Pier E', ]
+               'Struct side', 'Base plate L', 'Struct base', 'VC interior aerial',
+               'Mount plate L', 'Pier N', 'Base plate R', 'Mirror mount top', 'Pier W',
+               'VC interior wall', 'Struct top', 'Ambient', 'Mirror mount bottom',
+               'Pier S', 'Pier E', ]
         for c in lst:
             df = add_reference_column_at_periodic_interval_optimized(df, c, f'ref_{c}', interval)
             df[c] = df[c] - df[f'ref_{c}']
 
-
     return df
 
-#
+
+def add_missing_values(df):
+    df['diff'] = df['timestamp'].diff()
+    mask = (df['diff'] > pd.Timedelta(minutes=1)) & (df['diff'] < pd.Timedelta(minutes=5))
+    # Filter rows with gaps and calculate mid points
+    new_rows = []
+    for i in df[mask].index:
+        current_row = df.loc[i]
+        mid_timestamp = current_row['timestamp'] - pd.Timedelta(minutes=1)
+        new_row = current_row.copy()
+        new_row['timestamp'] = mid_timestamp
+        new_rows.append(new_row)
+    # Create a DataFrame from the new rows
+    new_df = pd.DataFrame(new_rows)
+    # Append the new rows to the original DataFrame
+    df = pd.concat([df, new_df], ignore_index=True)
+    # Drop the 'diff' column and sort again
+    df.drop(columns='diff', inplace=True)
+    df.sort_values('timestamp', inplace=True)
+    # Reset index for clean DataFrame
+    df.reset_index(drop=True, inplace=True)
+    return df
+
+
 def smooth_data(df, window=1):
     # Ensure we're working with a copy to avoid modifying the original dataframe
     new_df = pd.DataFrame()
@@ -107,7 +102,6 @@ def smooth_data(df, window=1):
 
 
 def split_train_test(df, test_date_str, train_date_start=None, train_date_end=None):
-
     start_timestamp = pd.to_datetime(test_date_str).normalize() + pd.Timedelta(hours=18)
     end_timestamp = start_timestamp + pd.Timedelta(days=1)
 
@@ -132,9 +126,9 @@ def filter_train_data_by_date(df, start_date, end_date):
 def get_column_list(df):
     col_list = df.columns.tolist()
     items_to_exclude = ['timestamp', 'Reference Mirror X-Motion', 'Reference Mirror Y-Motion',
-                       'Motorized Mirror X-Motion', 'Motorized Mirror Y-Motion',
-                       'Differential X-Motion', 'Differential Y-Motion',
-                       'diffX', 'diffY', 'date']
+                        'Motorized Mirror X-Motion', 'Motorized Mirror Y-Motion',
+                        'Differential X-Motion', 'Differential Y-Motion',
+                        'diffX', 'diffY', 'date']
     col_list = [item.replace('smoothed_', '') for item in col_list
                 if item.replace('smoothed_', '') not in items_to_exclude]
 
@@ -150,14 +144,14 @@ def filter_dataframe_by_hours(df, start_hour, end_hour):
 
 
 # this function add a reference column to the dataframe indicating the value of each column repeating every n minutes
-def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_name, interval):
+def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_name, interval, reference_hour=20):
     # Copy the DataFrame to avoid modifying the original
     new_df = df.copy()
 
     # Convert interval to hours if greater than 60 minutes, otherwise work with minutes
     if interval > 60:
         # Calculate the condition based on hours for intervals longer than 60 minutes
-        condition = (((new_df['timestamp'].dt.hour % (interval // 60)) == 20 % (interval // 60))
+        condition = (((new_df['timestamp'].dt.hour % (interval // 60)) == reference_hour % (interval // 60))
                      & (new_df['timestamp'].dt.minute == 0))
     else:
         # Calculate the condition based on minutes for intervals up to 60 minutes
@@ -177,7 +171,7 @@ def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_na
     return new_df
 
 
-def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options):
+def fit_and_predict_training_data(model_type, toggle_value, training_df, col, options, alpha=0.5):
     coef, intercept = 0, 0
     col_ref = col.replace('diff', 'ref')
     # if no option is selected, the reference value will be used as the prediction
@@ -204,6 +198,9 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
     # Select the model ["LR", "KNN", "XGB", "RNN"]
     if model_type == "LR":
         model = LinearRegression(fit_intercept=False)
+
+    elif model_type == "Lasso":
+        model = Lasso(alpha=10 ** alpha, fit_intercept=False)
 
     elif model_type == "KNN":
         model = KNeighborsRegressor(n_neighbors=1)
@@ -273,7 +270,7 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
     y_pred += np.array(y_ref)
     y_pred = list(y_pred.ravel())
 
-    if model_type == "LR" and len(toggle_value) > 0:
+    if model_type in ["LR", "Lasso"] and len(toggle_value) > 0:
         coef, intercept = model.coef_, model.intercept_
 
     return model, y_pred, rmse, max_err, coef, intercept
@@ -307,8 +304,38 @@ def predict_test_data(model, toggle_value, test_df, col, options):
     return y_pred, rmse, max_err
 
 
-def calc_rmse_maxerr(y, y_pred):
+# def find_best_inputs(desired_num_features, toggle_value, training_df, col, options):
+#     col_ref = col.replace('diff', 'ref')
+#
+#     # Create a mapping dictionary from value to label
+#     value_to_label = {option['value']: option['label'] for option in options}
+#
+#     # Build column names list for X based on toggle_value, avoiding specific ref columns
+#     col_names = [f'smoothed_{value_to_label[val]}' for val in toggle_value if
+#                  f'smoothed_{value_to_label[val]}' not in ['smoothed_refX', 'smoothed_refY']] + [col]
+#
+#     # Extract X and y from test_df using col_names
+#     X, y = training_df[col_names[:-1]].values, training_df[col].values.reshape(-1, 1)
+#     y_ref = training_df[col_ref].values.reshape(-1, 1)
+#     y = np.array(y) - np.array(y_ref)
+#
+#     alpha = 0.01
+#     lasso_model = Lasso(alpha=alpha, fit_intercept=False)
+#     lasso_model.fit(X, y)
+#     coefficients = lasso_model.coef_
+#     num_non_zero_coeffs = np.count_nonzero(coefficients)
+#     while num_non_zero_coeffs > desired_num_features and alpha < 1.0:
+#         alpha += 0.01
+#         lasso_model = Lasso(alpha=alpha, fit_intercept=False)
+#         lasso_model.fit(X, y)
+#         coefficients = lasso_model.coef_
+#         num_non_zero_coeffs = np.count_nonzero(coefficients)
+#     for c, t in zip(coefficients, col_names[:-1]):
+#         if c != 0:
+#             print(f'{t}: {c}')
 
+
+def calc_rmse_maxerr(y, y_pred):
     # Calculate RMSE
     rmse = mean_squared_error(y, y_pred, squared=False)
 

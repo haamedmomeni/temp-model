@@ -45,6 +45,15 @@ def generate_equation_str(coef, intercept, toggle_value):
     #     return f"Equation: y-y_ref = \sigma t-t_ref {' '.join(equation_terms)}"
 
 
+def generate_lasso_equation_str(coef, intercept, toggle_value):
+    coef_list = coef.flatten().tolist()
+    # if c in ceof_list is 0, then it is not included in the equation
+    equation_terms = [f"{'+' if c > 0 else ''}{c:.3f} &theta;<sub>{toggle_value[i][5:].lower()}</sub>" for i, c in enumerate(coef_list) if c != 0]
+    return dcc.Markdown(f"y - y<sub>ref</sub> = &Sigma;(&theta;<sub>i</sub> - &theta;<sub>i, ref</sub>) = "
+                        f" {' '.join(equation_terms)}",
+                        dangerously_allow_html=True)
+
+
 def create_graph_div(title, graph_id, data):
     return html.Div([
         dcc.Graph(
@@ -63,10 +72,10 @@ def create_graph_div(title, graph_id, data):
 
 def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str,
                                   train_date_start_str, train_date_end_str, diff_col,
-                                  train_fig_title, test_fig_title, options):
+                                  train_fig_title, test_fig_title, options, alpha):
     test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
     train_df, test_df = split_train_test(df, test_date, train_date_start_str, train_date_end_str)
-    print(f"train_df: {train_df.shape[0]}, test_df: {test_df.shape[0]}")
+    # print(f"train_df: {train_df.shape[0]}, test_df: {test_df.shape[0]}")
 
     trained_df_filtered = filter_dataframe_by_hours(train_df, start_hour, end_hour)
     test_df_filtered = filter_dataframe_by_hours(test_df, start_hour, end_hour)
@@ -85,7 +94,7 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
     y_test_std = np.std(y_test)
 
     model, y_pred_train, rmse_train, max_err_train, coef, intercept = fit_and_predict_training_data(
-        model_type, toggle_value, trained_df_filtered, diff_col, options)
+        model_type, toggle_value, trained_df_filtered, diff_col, options, alpha)
     y_pred_test, rmse_test, max_err_test = predict_test_data(
         model, toggle_value, test_df_filtered, diff_col, options)
 
@@ -100,6 +109,8 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
     equation_str = "No equation to display"
     if model_type == 'LR' and len(toggle_value) > 0:
         equation_str = generate_equation_str(coef, intercept, toggle_value)
+    elif model_type == 'Lasso' and len(toggle_value) > 0:
+        equation_str = generate_lasso_equation_str(coef, intercept, toggle_value)
 
     return create_figure(train_data_list, train_fig_title), create_figure(test_data_list, test_fig_title), equation_str
 
