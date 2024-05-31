@@ -73,6 +73,7 @@ def create_graph_div(title, graph_id, data):
 def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour, df, test_date_str,
                                   train_date_start_str, train_date_end_str, diff_col,
                                   train_fig_title, test_fig_title, options, alpha):
+
     test_date = datetime.strptime(test_date_str, '%Y/%m/%d')
     train_df, test_df = split_train_test(df, test_date, train_date_start_str, train_date_end_str)
     # print(f"train_df: {train_df.shape[0]}, test_df: {test_df.shape[0]}")
@@ -82,7 +83,6 @@ def update_graphs_and_predictions(model_type, toggle_value, start_hour, end_hour
 
     trained_df_filtered = smooth_data(trained_df_filtered)
     test_df_filtered = smooth_data(test_df_filtered)
-
 
     t_train = trained_df_filtered['timestamp'].values
     t_test = test_df_filtered['timestamp'].values
@@ -140,13 +140,13 @@ def update_graphs_raw(toggle_value, start_hour, end_hour, df, test_date_str,
         col_ref = 'smoothed_' + col.replace('smoothed', 'ref')
         y_train = trained_df_filtered[col].values
         y_ref_train = trained_df_filtered[col_ref].values
-        y_train = y_train + y_ref_train
+        y_train += y_ref_train
         train_data_list.append(generate_scatter_plot(t_train, y_train, random_color, f'<b>{col_name}</b>'))
 
         y_test = test_df_filtered[col].values
         y_ref_test = test_df_filtered[col_ref].values
-        y_test = y_test + y_ref_test
+        y_test += y_ref_test
         test_data_list.append(generate_scatter_plot(t_test, y_test, random_color, f'<b>{col_name}</b>'))
 
-    return create_figure(train_data_list, train_fig_title, y_label),\
-            create_figure(test_data_list, test_fig_title, y_label)
+    return (create_figure(train_data_list, train_fig_title, y_label),
+            create_figure(test_data_list, test_fig_title, y_label))

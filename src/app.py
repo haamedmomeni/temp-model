@@ -22,7 +22,7 @@ def generate_dropdown(label, id, options, value, style, label_style, div_style):
 
 
 # Load data
-FILENAME = '../data/2024-03-30_04-18.csv'
+FILENAME = '../data/M4M5.csv'
 raw_df = load_csv(FILENAME)
 
 # Preprocess data
@@ -294,10 +294,9 @@ def func(n_clicks, toggle_value, start_hour, end_hour, test_date_str, train_date
     return dcc.send_bytes(zip_buffer.getvalue(), filename="data.zip")
 
 
-def update_processed_data(interval, reference_hour=20):
+def update_processed_data(interval, reference_hour):
     # Re-load raw data if needed, or use it if already available in memory
     raw_df = load_csv(FILENAME)  # Consider optimizing this to avoid reloading
-
     # Update the call to your preprocess function with the selected interval
     processed_df = preprocess_data(raw_df, interval, reference_hour)  # Adjust function signature as needed
     processed_df = smooth_data(processed_df, 1)

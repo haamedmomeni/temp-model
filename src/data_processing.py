@@ -40,13 +40,13 @@ def preprocess_data(df, interval, reference_hour=20):
                                                                  interval, reference_hour)
         df = add_reference_column_at_periodic_interval_optimized(df, 'diffY', 'refY',
                                                                  interval, reference_hour)
-        lst = ['Mount plate R',
-               'Struct side', 'Base plate L', 'Struct base', 'VC interior aerial',
-               'Mount plate L', 'Pier N', 'Base plate R', 'Mirror mount top', 'Pier W',
-               'VC interior wall', 'Struct top', 'Ambient', 'Mirror mount bottom',
-               'Pier S', 'Pier E', ]
+
+        keywords = ['time', 'date', 'centroid', 'diff', 'ref']
+        lst = [col for col in df.columns if all(keyword not in col for keyword in keywords)]
+
         for c in lst:
-            df = add_reference_column_at_periodic_interval_optimized(df, c, f'ref_{c}', interval)
+            df = add_reference_column_at_periodic_interval_optimized(df, c, f'ref_{c}',
+                                                                     interval, reference_hour)
             df[c] = df[c] - df[f'ref_{c}']
 
     return df
@@ -125,6 +125,8 @@ def filter_train_data_by_date(df, start_date, end_date):
 
 def get_column_list(df):
     col_list = df.columns.tolist()
+    keywords = ['time', 'centroid', 'diff']
+    col_list = [col for col in col_list if all(keyword not in col for keyword in keywords)]
     items_to_exclude = ['timestamp', 'Reference Mirror X-Motion', 'Reference Mirror Y-Motion',
                         'Motorized Mirror X-Motion', 'Motorized Mirror Y-Motion',
                         'Differential X-Motion', 'Differential Y-Motion',
@@ -144,7 +146,7 @@ def filter_dataframe_by_hours(df, start_hour, end_hour):
 
 
 # this function add a reference column to the dataframe indicating the value of each column repeating every n minutes
-def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_name, interval, reference_hour=20):
+def add_reference_column_at_periodic_interval_optimized(df, col_name, new_col_name, interval, reference_hour):
     # Copy the DataFrame to avoid modifying the original
     new_df = df.copy()
 
