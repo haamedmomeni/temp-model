@@ -5,6 +5,7 @@ import numpy as np
 import pandas as pd
 from matplotlib import pyplot as plt
 import seaborn as sns
+from sklearn.linear_model import LinearRegression
 
 # Constants
 FILE_PATH_TRAIN = '../data/train_data.csv'
@@ -43,95 +44,75 @@ def add_reference_column_at_hour_start(df, column_name, new_column_name, hours=1
 
 
 # Load and preprocess data
-df_train = pd.read_csv(FILE_PATH_TRAIN)
-df_train['timestamp'] = pd.to_datetime(df_train['timestamp'])
-x = df_train[TARGET_COLUMN_X].values.reshape(-1, 1)
-y = df_train[TARGET_COLUMN_Y].values.reshape(-1, 1)
+df = pd.read_csv(FILE_PATH_TRAIN)
+df['timestamp'] = pd.to_datetime(df['timestamp'])
+
+timestamp0 = pd.to_datetime('2024-02-03 18:00:00')
+condition = df['timestamp'] > timestamp0
+df_train, df_test = df[~condition].copy(), df[condition].copy()
+df_test = df
+
+col_list = df.columns.tolist()
+keywords = ['time', 'ref', 'diff']
+col_list = [col for col in col_list if all(keyword not in col for keyword in keywords)]
+
+x = df_test[TARGET_COLUMN_X].values.reshape(-1, 1)
+y = df_test[TARGET_COLUMN_Y].values.reshape(-1, 1)
 
 # Analysis parameters
-n_hours_range = np.arange(1/6, 5, 1/6)  # From 0.5 to 6 hours, in half-hour increments
+# n_hours_range = np.arange(1/6, 5, 1/6)  # From 0.5 to 6 hours, in half-hour increments
+n_hours_range = [1/6, 2/6, 3/6, 1, 2, 4, 12]  # From 0.5 to 6 hours, in half-hour increments
+print(n_hours_range*60)
 std_values, max_error_values = [], []
 
-# Create a figure with two subplots side by side
-fig, axs = plt.subplots(1, 2, figsize=(12, 4))
+# Create a figure
+fig = plt.plot(figsize=(12, 4))
 
 # First subplot for error distributions
 for i, n_hours in enumerate(n_hours_range):
-    temp_df = add_reference_column_at_hour_start(df_train.copy(), TARGET_COLUMN_Y, 'ref_y', n_hours)
+    temp_df = add_reference_column_at_hour_start(df_test.copy(), TARGET_COLUMN_Y, 'ref_y', n_hours)
     temp_df = add_reference_column_at_hour_start(temp_df, TARGET_COLUMN_X, 'ref_x', n_hours)
-    x_pred = temp_df['ref_x'].values.reshape(-1, 1)
-    y_pred = temp_df['ref_y'].values.reshape(-1, 1)
+    x_periodic = temp_df['ref_x'].values.reshape(-1, 1)
+    y_periodic = temp_df['ref_y'].values.reshape(-1, 1)
 
-    errors = calculate_misalignment_error(ERROR_TYPE, x, y, x_pred, y_pred)
+    xx = df_test[TARGET_COLUMN_X].values.reshape(-1, 1) - temp_df['ref_x'].values.reshape(-1, 1)
+    regressors = temp_df[col_list].values
+    model = LinearRegression(fit_intercept=False)
+    model.fit(regressors, xx)
+    # x_periodic = model.predict(regressors) + temp_df['ref_x'].values.reshape(-1, 1)
+
+    errors = calculate_misalignment_error(ERROR_TYPE, x, y, x_periodic, y_periodic)
     std_val = np.std(errors)
     max_val = np.max(np.abs(errors))
     std_values.append(std_val)
     max_error_values.append(max_val)
 
     # Plot for specific intervals
-    if any(np.isclose(n_hours, target_hour, atol=1e-2) for target_hour in [1/6, 2/6, 3/6, 1, 2, 4]):
-        # sns.histplot(errors.flatten(), binwidth=0.025, element='step', fill=False, color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min, std={std_val:.3f}', linewidth=2, ax=axs[0])
-        sns.ecdfplot(errors.flatten(), color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min', linewidth=2, ax=axs[0]) # , std={std_val:.3f}
+    # if any(np.isclose(n_hours, target_hour, atol=1e-2) for target_hour in [1/6, 2/6, 3/6, 1, 2, 4]):
+    # sns.histplot(errors.flatten(), binwidth=0.025, element='step', fill=False, color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min, std={std_val:.3f}', linewidth=2)
+    sns.ecdfplot(errors.flatten(), color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min', linewidth=2) # , std={std_val:.3f}
 
+ax = plt.gca()
 # Add a vertical line at x=0.2
-axs[0].axvline(x=0.2, color='black', linestyle='--', linewidth=1)
+ax.axvline(x=0.2, color='black', linestyle='--', linewidth=1)
 
 
 # Annotation for the vertical line
 x_val = 0.2
 y_val = 0.0
-axs[0].annotate('Error Budget = 0.2 arcsec', xy=(x_val, y_val), xytext=(x_val + 0.1, y_val + 0.1),
+ax.annotate('Error Budget = 0.2 arcsec', xy=(x_val, y_val), xytext=(x_val + 0.1, y_val + 0.1),
                 arrowprops=dict(facecolor='black', shrink=0.05, width=0.1, headwidth=3, headlength=4, linewidth=0.5),
                 fontsize=9, color='black')
 
-axs[0].legend(title='Frequency of alignment', loc='best')
-axs[0].set_title('CDF of misalignment errors')
-axs[0].set_xlabel('Error (pixels, ~1 arcsec)')
-axs[0].set_ylabel('Probability')
-axs[0].grid(True, which='both', axis='y')
+ax.legend(title='Frequency of alignment', loc='best')
+ax.set_title('CDF of misalignment errors')
+ax.set_xlabel('Error (pixels, ~1 arcsec)')
+ax.set_ylabel('Probability')
+ax.grid(True, which='both', axis='y')
 if ERROR_TYPE == 'euclidean':
-    axs[0].set_xlim(0, 2)
+    ax.set_xlim(0, 3)
 else:
-    axs[0].set_xlim(-1, 1)
+    ax.set_xlim(-1, 1)
 
-# Second subplot for Std and Max Error over time
-n_minutes_range = n_hours_range * 60
-line1 = axs[1].plot(n_minutes_range, std_values, label='Std', marker='o', color='blue', linestyle='-')
-axs[1].set_xlabel('Frequency of realignment (each x minutes)')
-axs[1].set_ylabel('Std (pixels, ~1 arcsec)', color='blue')
-axs[1].tick_params(axis='y', labelcolor='blue')
-
-ax2 = axs[1].twinx()
-line2 = ax2.plot(n_minutes_range, max_error_values, label='Max Error', marker='x', color='red', linestyle='--')
-ax2.set_ylabel('Max error (pixels, ~1 arcsec)', color='red')
-ax2.tick_params(axis='y', labelcolor='red')
-
-lines = line1 + [line2[0]]
-labels = [l.get_label() for l in lines]
-axs[1].legend(lines, labels, loc='upper left')
-axs[1].set_title('Misalignment error over different realignment frequencies')
-axs[1].grid(True)
-
-plt.tight_layout()
-plt.savefig(f"{PLOT_NAME}_analyze.jpg")
-plt.show()
-
-figure = plt.figure(figsize=(12, 4))
-n_hours = 1/6
-
-y_train = df_train[TARGET_COLUMN_Y].values.reshape(-1, 1)
-y_pred_train = temp_df['ref_y'].values.reshape(-1, 1)
-errors = y_train - y_pred_train
-plt.scatter(df_train['timestamp'], y_pred_train - y_train, marker='.', color='blue', linestyle='-')
-
-y_train = df_train[TARGET_COLUMN_X].values.reshape(-1, 1)
-y_pred_train = temp_df['ref_x'].values.reshape(-1, 1)
-errors = y_train - y_pred_train
-plt.scatter(df_train['timestamp'], y_pred_train - y_train, marker='.', color='red', linestyle='-')
-
-y_train = (df_train[TARGET_COLUMN_Y].values.reshape(-1, 1) ** 2 + df_train[TARGET_COLUMN_X].values.reshape(-1, 1) ** 2) ** 0.5
-y_pred_train = (temp_df['ref_x'].values.reshape(-1, 1) ** 2 + temp_df['ref_y'].values.reshape(-1, 1) ** 2) ** 0.5
-errors = y_train - y_pred_train
-plt.scatter(df_train['timestamp'], y_pred_train - y_train, marker='.', color='green', linestyle='-')
-
+plt.savefig(f'../data/{PLOT_NAME}.png')
 plt.show()

@@ -13,7 +13,7 @@ COLOR_PALETTE = sns.color_palette("flare", NUM_COLORS)
 TARGET_COLUMN_X = 'smoothed_difference_1_3'
 TARGET_COLUMN_Y = 'smoothed_difference_2_4'
 PLOT_NAME = 'alignment_frequency'
-ERROR_TYPE = 'y'  # 'euclidean', 'x', 'y'
+ERROR_TYPE = 'euclidean'  # 'euclidean', 'x', 'y'
 
 
 def calculate_misalignment_error(error_type, x, y, x_pred, y_pred):
@@ -70,14 +70,27 @@ for i, n_hours in enumerate(n_hours_range):
 
     # Plot for specific intervals
     if any(np.isclose(n_hours, target_hour, atol=1e-2) for target_hour in [1/6, 2/6, 3/6, 1, 2, 4]):
-        sns.histplot(errors.flatten(), binwidth=0.025, element='step', fill=False, color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min, std={std_val:.3f}', linewidth=2, ax=axs[0])
+        # sns.histplot(errors.flatten(), binwidth=0.025, element='step', fill=False, color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min, std={std_val:.3f}', linewidth=2, ax=axs[0])
+        sns.ecdfplot(errors.flatten(), color=COLOR_PALETTE[i % NUM_COLORS], label=f'{60 * n_hours:.0f} min', linewidth=2, ax=axs[0]) # , std={std_val:.3f}
 
-axs[0].legend(title='Frequency of alignment each ', loc='best')
-axs[0].set_title('PDF of misalignment errors')
+# Add a vertical line at x=0.2
+axs[0].axvline(x=0.2, color='black', linestyle='--', linewidth=1)
+
+
+# Annotation for the vertical line
+x_val = 0.2
+y_val = 0.0
+axs[0].annotate('Error Budget = 0.2 arcsec', xy=(x_val, y_val), xytext=(x_val + 0.1, y_val + 0.1),
+                arrowprops=dict(facecolor='black', shrink=0.05, width=0.1, headwidth=3, headlength=4, linewidth=0.5),
+                fontsize=9, color='black')
+
+axs[0].legend(title='Frequency of alignment', loc='best')
+axs[0].set_title('CDF of misalignment errors')
 axs[0].set_xlabel('Error (pixels, ~1 arcsec)')
-axs[0].set_ylabel('Density')
+axs[0].set_ylabel('Probability')
+axs[0].grid(True, which='both', axis='y')
 if ERROR_TYPE == 'euclidean':
-    axs[0].set_xlim(-.1, 2)
+    axs[0].set_xlim(0, 2)
 else:
     axs[0].set_xlim(-1, 1)
 

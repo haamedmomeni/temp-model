@@ -4,6 +4,8 @@ from sklearn.linear_model import LinearRegression
 from sklearn.neighbors import KNeighborsRegressor
 from sklearn.ensemble import RandomForestRegressor
 import xgboost as xg
+from sklearn.pipeline import make_pipeline
+from sklearn.preprocessing import StandardScaler
 from sklearn.svm import SVR
 from sklearn.metrics import mean_squared_error, max_error
 from sklearn.linear_model import Lasso
@@ -203,6 +205,7 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
 
     elif model_type == "Lasso":
         model = Lasso(alpha=10 ** alpha, fit_intercept=False)
+        # model = make_pipeline(StandardScaler(), Lasso(alpha=10 ** alpha, fit_intercept=False))
 
     elif model_type == "KNN":
         model = KNeighborsRegressor(n_neighbors=1)
@@ -274,6 +277,12 @@ def fit_and_predict_training_data(model_type, toggle_value, training_df, col, op
 
     if model_type in ["LR", "Lasso"] and len(toggle_value) > 0:
         coef, intercept = model.coef_, model.intercept_
+
+    # if model_type == "Lasso":
+    #     print(model.named_steps)
+    #     model0 = model.named_steps['lasso']
+    #     print(model0.coef_)
+    #     coef, intercept = model0.coef_, model0.intercept_
 
     return model, y_pred, rmse, max_err, coef, intercept
 
